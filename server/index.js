@@ -20,6 +20,50 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+// Validation helpers
+function validateDonorPayload(data) {
+  const errors = [];
+  if (!data.name || typeof data.name !== 'string' || data.name.trim().length < 2) {
+    errors.push('Name is required and must be at least 2 characters');
+  }
+  if (!data.bloodGroup || !VALID_BLOOD_GROUPS.includes(data.bloodGroup.toUpperCase())) {
+    errors.push(`Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}`);
+  }
+  if (!data.phone || data.phone.replace(/\D/g, '').length < 10) {
+    errors.push('Valid phone number with at least 10 digits is required');
+  }
+  if (!data.city || typeof data.city !== 'string') {
+    errors.push('City/District is required');
+  }
+  return errors;
+}
+
+function validateRequestPayload(data) {
+  const errors = [];
+  if (!data.patientName || typeof data.patientName !== 'string') {
+    errors.push('Patient name is required');
+  }
+  if (!data.bloodGroup || !VALID_BLOOD_GROUPS.includes(data.bloodGroup.toUpperCase())) {
+    errors.push(`Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}`);
+  }
+  if (!data.hospitalName || typeof data.hospitalName !== 'string') {
+    errors.push('Hospital name is required');
+  }
+  if (!data.city || typeof data.city !== 'string') {
+    errors.push('City/District is required');
+  }
+  if (!data.mobile || data.mobile.replace(/\D/g, '').length < 10) {
+    errors.push('Valid contact mobile number is required');
+  }
+  const units = parseInt(data.unitsRequired);
+  if (isNaN(units) || units < 1 || units > 20) {
+    errors.push('Units required must be between 1 and 20');
+  }
+  return errors;
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'NeoBlood MongoDB API', timestamp: new Date().toISOString() });
@@ -29,17 +73,25 @@ app.get('/api/health', (req, res) => {
    DONORS CRUD ENDPOINTS
    ========================================================================== */
 
-// [CREATE] Register a new donor
+// [CREATE] Register a new donor with validation
 app.post('/api/donors', async (req, res) => {
   try {
-    const donor = await createDonor(req.body);
+    const errors = validateDonorPayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    const donor = await createDonor({
+      ...req.body,
+      bloodGroup: req.body.bloodGroup.toUpperCase()
+    });
     res.status(201).json({ success: true, data: donor });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// [READ] Get donors (with query filters: ?bloodGroup=O+&city=Madurai&isAvailable=true)
+// [READ] Get donors with query filters
 app.get('/api/donors', async (req, res) => {
   try {
     const donors = await getDonors(req.query);
@@ -64,6 +116,7 @@ app.get('/api/donors/:id', async (req, res) => {
 app.put('/api/donors/:id', async (req, res) => {
   try {
     const updated = await updateDonor(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ success: false, message: 'Donor not found' });
     res.json({ success: true, data: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -84,17 +137,25 @@ app.delete('/api/donors/:id', async (req, res) => {
    BLOOD REQUESTS CRUD ENDPOINTS
    ========================================================================== */
 
-// [CREATE] Post emergency blood request
+// [CREATE] Post emergency blood request with validation
 app.post('/api/requests', async (req, res) => {
   try {
-    const newReq = await createRequest(req.body);
+    const errors = validateRequestPayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    const newReq = await createRequest({
+      ...req.body,
+      bloodGroup: req.body.bloodGroup.toUpperCase()
+    });
     res.status(201).json({ success: true, data: newReq });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// [READ] Get blood requests (with filters: ?city=Madurai&bloodGroup=O+&status=OPEN)
+// [READ] Get blood requests with filters
 app.get('/api/requests', async (req, res) => {
   try {
     const requests = await getRequests(req.query);
@@ -119,6 +180,7 @@ app.get('/api/requests/:id', async (req, res) => {
 app.put('/api/requests/:id', async (req, res) => {
   try {
     const updated = await updateRequest(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ success: false, message: 'Request not found' });
     res.json({ success: true, data: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -129,6 +191,9 @@ app.put('/api/requests/:id', async (req, res) => {
 app.post('/api/requests/:id/pledge', async (req, res) => {
   try {
     const { donorId, donorName } = req.body;
+    if (!donorId || !donorName) {
+      return res.status(400).json({ success: false, message: 'donorId and donorName are required to pledge' });
+    }
     const pledged = await pledgeRequest(req.params.id, donorId, donorName);
     res.json({ success: true, data: pledged });
   } catch (err) {

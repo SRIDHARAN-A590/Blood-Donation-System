@@ -5,6 +5,9 @@ export default function HomeTab({
   currentUser,
   donors,
   requests,
+  loadingData,
+  dbError,
+  onRetryConnection,
   onAcceptRequest,
   onOpenCreateRequest,
   onLoginClick
@@ -46,6 +49,34 @@ export default function HomeTab({
 
   return (
     <div id="view-home" className="tab-view active" style={{ display: 'block' }}>
+      {/* DB Connection Error Banner if server unreachable */}
+      {dbError && (
+        <div
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #ef4444',
+            borderRadius: '10px',
+            padding: '14px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            color: '#b91c1c'
+          }}
+        >
+          <div>
+            <strong>⚠️ Database Connection Warning:</strong> Could not connect to MongoDB API. Please ensure the backend server is running.
+          </div>
+          <button
+            className="btn btn-primary"
+            style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+            onClick={onRetryConnection}
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="hero-section-clean">
         <h1 className="hero-title">
@@ -211,11 +242,23 @@ export default function HomeTab({
 
       {/* Requests & Donors Grid */}
       <div className="grid-3" id="requests-grid" style={{ marginTop: '20px' }}>
+        {/* Loading Skeletons */}
+        {loadingData && donors.length === 0 && requests.length === 0 && (
+          [1, 2, 3].map(n => (
+            <div key={'skeleton-' + n} className="glass-card card-item" style={{ padding: '24px', opacity: 0.6 }}>
+              <div style={{ height: '20px', width: '50%', background: '#e2e8f0', borderRadius: '4px', marginBottom: '12px' }} />
+              <div style={{ height: '28px', width: '75%', background: '#cbd5e1', borderRadius: '4px', marginBottom: '16px' }} />
+              <div style={{ height: '14px', width: '60%', background: '#e2e8f0', borderRadius: '4px', marginBottom: '8px' }} />
+              <div style={{ height: '14px', width: '40%', background: '#e2e8f0', borderRadius: '4px' }} />
+            </div>
+          ))
+        )}
+
         {/* Render Donor Cards */}
         {filteredDonors.map(donor => {
-          const isMe = currentUser && donor.uid === currentUser.uid;
+          const isMe = currentUser && (donor.uid === currentUser.uid || donor._id === currentUser._id);
           return (
-            <div key={donor.uid} className="glass-card card-item" style={{ borderLeft: '4px solid #10b981', position: 'relative' }}>
+            <div key={donor._id || donor.uid} className="glass-card card-item" style={{ borderLeft: '4px solid #10b981', position: 'relative' }}>
               {isMe && (
                 <div style={{ position: 'absolute', top: '10px', right: '12px', fontSize: '0.7rem', background: '#10b981', color: 'white', padding: '2px 8px', borderRadius: '20px', fontWeight: 700 }}>
                   You
@@ -252,7 +295,7 @@ export default function HomeTab({
           const canAccept = currentUser && currentUser.role === 'donor' && !req.acceptedDonorId;
 
           return (
-            <div key={req.requestId} className="glass-card card-item" style={{ borderLeft: `4px solid ${borderColor}` }}>
+            <div key={req._id || req.requestId} className="glass-card card-item" style={{ borderLeft: `4px solid ${borderColor}` }}>
               <div className="card-header">
                 <div>
                   <div
@@ -286,7 +329,7 @@ export default function HomeTab({
 
               {req.acceptedDonorId && (
                 <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(16,185,129,0.08)', borderRadius: '8px', fontSize: '0.82rem', color: '#10b981', fontWeight: 600 }}>
-                  ✅ Donor {req.acceptedDonorName} has accepted this request
+                  ✅ Donor {req.acceptedDonorName} has pledged for this request
                 </div>
               )}
 
@@ -295,7 +338,7 @@ export default function HomeTab({
                   <button
                     className="btn btn-success"
                     style={{ flex: 1 }}
-                    onClick={() => onAcceptRequest(req.requestId)}
+                    onClick={() => onAcceptRequest(req._id || req.requestId)}
                   >
                     ✅ Accept & Donate
                   </button>
@@ -305,7 +348,7 @@ export default function HomeTab({
           );
         })}
 
-        {filteredDonors.length === 0 && filteredRequests.length === 0 && (
+        {!loadingData && filteredDonors.length === 0 && filteredRequests.length === 0 && (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 20px' }}>
             <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔍</div>
             <p style={{ color: '#94a3b8', fontSize: '1rem' }}>No donors or active requests found matching your search.</p>
