@@ -297,9 +297,9 @@ export default function CreateRequestTab({
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
-                  {matchingDonors.map(donor => (
+                  {matchingDonors.map((donor, idx) => (
                     <div
-                      key={donor.uid}
+                      key={donor._id || donor.uid || idx}
                       style={{
                         padding: '10px 14px',
                         background: '#f8fafc',

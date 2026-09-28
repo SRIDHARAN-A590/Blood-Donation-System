@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, User, AlertCircle, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Phone, AlertCircle, Loader2 } from 'lucide-react';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { api } from '../services/api';
@@ -8,6 +8,7 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose, onSu
   const [mode, setMode] = useState(initialMode); // 'login' or 'register'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,6 +26,7 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose, onSu
   const resetForm = () => {
     setName('');
     setEmail('');
+    setPhone('');
     setPassword('');
     setConfirmPassword('');
     setErrorMsg('');
@@ -86,6 +88,10 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose, onSu
         setErrorMsg('Please enter a valid Gmail / Email address.');
         return;
       }
+      if (!phone.trim() || phone.replace(/\D/g, '').length < 10) {
+        setErrorMsg('Please enter a valid phone number with at least 10 digits.');
+        return;
+      }
       if (password.length < 6) {
         setErrorMsg('Password must be at least 6 characters.');
         return;
@@ -112,6 +118,7 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose, onSu
         const res = await api.register({
           name: name.trim(),
           email: trimmedEmail,
+          phone: phone.trim(),
           password
         });
 
@@ -394,6 +401,30 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose, onSu
               />
             </div>
           </div>
+
+          {/* Register Mode Only: Phone Number */}
+          {mode === 'register' && (
+            <div className="form-group" style={{ marginBottom: '14px' }}>
+              <label className="form-label" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                Phone Number
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Phone
+                  size={18}
+                  style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+                />
+                <input
+                  type="tel"
+                  className="form-control"
+                  style={{ paddingLeft: '38px', height: '44px', borderRadius: '10px' }}
+                  placeholder="e.g. +91 98765 43210"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          )}
 
           {/* Both Modes: Password */}
           <div className="form-group" style={{ marginBottom: mode === 'register' ? '14px' : '20px' }}>

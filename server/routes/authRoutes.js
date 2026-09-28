@@ -29,6 +29,7 @@ function sanitizeUser(user, donorProfile = null) {
     id: String(user._id || user.id),
     name: user.name,
     email: user.email,
+    phone: user.phone || null,
     role: user.role || 'user',
     authProviders: user.authProviders || ['password'],
     emailVerified: !!user.emailVerified,
@@ -37,10 +38,10 @@ function sanitizeUser(user, donorProfile = null) {
   };
 }
 
-// [REGISTER] Email + Password
+// [REGISTER] Email + Phone + Password
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, phone, password } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       return res.status(400).json({ success: false, error: 'Full name must be at least 2 characters' });
@@ -48,6 +49,10 @@ router.post('/register', async (req, res) => {
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       return res.status(400).json({ success: false, error: 'A valid email address is required' });
+    }
+
+    if (!phone || phone.replace(/\D/g, '').length < 10) {
+      return res.status(400).json({ success: false, error: 'A valid phone number with at least 10 digits is required' });
     }
 
     if (!password || password.length < 6) {
@@ -66,6 +71,7 @@ router.post('/register', async (req, res) => {
     const newUser = await createUser({
       name: name.trim(),
       email: normalizedEmail,
+      phone: phone.trim(),
       passwordHash,
       authProviders: ['password'],
       role: 'user',

@@ -7,11 +7,11 @@ function getAuthHeader() {
 
 export const api = {
   // Authentication
-  async register({ name, email, password }) {
+  async register({ name, email, phone, password }) {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password })
+      body: JSON.stringify({ name, email, phone, password })
     });
     const json = await res.json();
     if (!res.ok || !json.success) {

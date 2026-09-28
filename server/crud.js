@@ -16,13 +16,14 @@ export function toMongoId(id) {
 /**
  * [CREATE] Create an application user
  */
-export async function createUser({ name, email, passwordHash = null, authProviders = ['password'], googleId = null, role = 'user', emailVerified = false }) {
+export async function createUser({ name, email, phone = null, passwordHash = null, authProviders = ['password'], googleId = null, role = 'user', emailVerified = false }) {
   const db = await connectToMongoDB();
   const normalizedEmail = email.trim().toLowerCase();
 
   const userDoc = {
     name: name.trim(),
     email: normalizedEmail,
+    phone: phone ? phone.trim() : null,
     passwordHash,
     authProviders,
     googleId,
