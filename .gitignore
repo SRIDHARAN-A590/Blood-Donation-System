@@ -43,9 +43,8 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
-# Environment variables & secrets
+# Environment & Credentials
 .env
 .env.*
 *.env
-atlas-credentials.env
-firebase-debug.log
+.firebase/
