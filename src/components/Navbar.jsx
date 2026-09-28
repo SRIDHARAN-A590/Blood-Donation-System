@@ -20,10 +20,10 @@ export const Navbar = ({ activePage, setActivePage }) => {
         {/* Brand */}
         <div className="nav-brand" onClick={() => handleNavClick('landing')}>
           <div className="brand-icon-wrap" style={{ overflow: 'hidden', padding: 0 }}>
-            <img src="/logo.jpg" alt="LifeFlow Logo" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '10px' }} />
+            <img src="/logo.jpg" alt="NeoBlood Logo" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '10px' }} />
           </div>
           <div className="brand-text">
-            <span className="brand-title">Life<span>Flow</span></span>
+            <span className="brand-title">Neo<span>Blood</span></span>
             <span className="brand-subtitle">Blood Network</span>
           </div>
         </div>

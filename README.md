@@ -1,11 +1,11 @@
-# LifeFlow — Smart Blood Donation & Emergency Hospital Network
+# NeoBlood — Smart Blood Donation & Emergency Hospital Network
 
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ESNext-F7DF1E?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**LifeFlow** is a modern, responsive, and user-friendly web application designed to connect voluntary blood donors with hospitals, blood banks, and patients during critical emergencies. Built with React and Vite JavaScript, it delivers real-time search, interactive compatibility charts, donor eligibility checks, and instant dispatch boards.
+**NeoBlood** is a modern, responsive, and user-friendly web application designed to connect voluntary blood donors with hospitals, blood banks, and patients during critical emergencies. Built with React and Vite JavaScript, it delivers real-time search, interactive compatibility charts, donor eligibility checks, and instant dispatch boards.
 
 ---
 

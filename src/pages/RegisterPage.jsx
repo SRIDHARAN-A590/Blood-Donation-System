@@ -50,7 +50,7 @@ export const RegisterPage = ({ setActivePage }) => {
     });
 
     if (success) {
-      showToast('Welcome to the LifeFlow Hero community! You are now registered.', 'success');
+      showToast('Welcome to the NeoBlood Hero community! You are now registered.', 'success');
       try {
         confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
       } catch (err) {}

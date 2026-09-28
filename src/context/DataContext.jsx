@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const REQUESTS_STORAGE_KEY = 'lifeflow_requests_v1';
+const REQUESTS_STORAGE_KEY = 'neoblood_requests_v1';
 
 const DEFAULT_BLOOD_BANKS = [
   {
@@ -124,7 +124,7 @@ const DEFAULT_CAMPS = [
     city: 'Chicago',
     date: '2026-10-18',
     time: '08:30 AM - 03:30 PM',
-    organizer: 'LifeFlow Alliance',
+    organizer: 'NeoBlood Alliance',
     registeredCount: 65
   }
 ];

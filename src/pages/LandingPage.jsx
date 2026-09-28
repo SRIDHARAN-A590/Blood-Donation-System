@@ -127,10 +127,10 @@ export const LandingPage = ({ setActivePage }) => {
       <section className="section" style={{ background: 'white' }}>
         <div className="container">
           <div className="section-head">
-            <span className="section-tag">Why LifeFlow Works</span>
+            <span className="section-tag">Why NeoBlood Works</span>
             <h2 className="section-title">Designed for Urgency, Trust & Speed</h2>
             <p className="section-desc">
-              In critical situations, every second counts. LifeFlow simplifies blood coordination so patients receive urgent blood without bureaucratic delays.
+              In critical situations, every second counts. NeoBlood simplifies blood coordination so patients receive urgent blood without bureaucratic delays.
             </p>
           </div>
 

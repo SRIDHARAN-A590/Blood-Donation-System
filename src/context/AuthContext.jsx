@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const USERS_STORAGE_KEY = 'lifeflow_users_v1';
-const CURRENT_USER_KEY = 'lifeflow_current_user_v1';
+const USERS_STORAGE_KEY = 'neoblood_users_v1';
+const CURRENT_USER_KEY = 'neoblood_current_user_v1';
 
 const DEFAULT_USERS = [
   {

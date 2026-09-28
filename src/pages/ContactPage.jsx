@@ -193,7 +193,7 @@ export const ContactPage = () => {
                   <div>
                     <strong style={{ fontSize: '0.95rem' }}>General Support Email</strong>
                     <p style={{ color: '#475569', fontSize: '0.88rem', margin: '2px 0 0' }}>
-                      support@lifeflow-network.org
+                      support@neoblood-network.org
                     </p>
                   </div>
                 </div>

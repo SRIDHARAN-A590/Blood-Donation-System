@@ -13,11 +13,11 @@ export const Footer = ({ setActivePage }) => {
                 <Droplet size={18} fill="white" />
               </div>
               <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'white' }}>
-                Life<span style={{ color: '#e63946' }}>Flow</span>
+                Neo<span style={{ color: '#e63946' }}>Blood</span>
               </span>
             </div>
             <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: '1.7', marginBottom: '20px' }}>
-              Every two seconds, someone needs blood. LifeFlow bridges the critical gap between emergency blood requests and willing donors with live telemetry and direct communication.
+              Every two seconds, someone needs blood. NeoBlood bridges the critical gap between emergency blood requests and willing donors with live telemetry and direct communication.
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '0.84rem', fontWeight: 600 }}>
               <ShieldCheck size={16} />
@@ -58,7 +58,7 @@ export const Footer = ({ setActivePage }) => {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Mail size={18} color="#e63946" />
-                <span>support@lifeflow-network.org</span>
+                <span>support@neoblood-network.org</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <MapPin size={18} color="#e63946" />
@@ -69,7 +69,7 @@ export const Footer = ({ setActivePage }) => {
         </div>
 
         <div className="footer-bottom">
-          <p>© {new Date().getFullYear()} LifeFlow Network. Built with React & Vite. Saving lives together.</p>
+          <p>© {new Date().getFullYear()} NeoBlood Network. Built with React & Vite. Saving lives together.</p>
           <div style={{ display: 'flex', gap: '20px' }}>
             <span style={{ color: '#64748b' }}>Privacy Policy</span>
             <span style={{ color: '#64748b' }}>Terms of Service</span>
