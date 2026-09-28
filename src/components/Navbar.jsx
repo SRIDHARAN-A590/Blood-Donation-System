@@ -1,193 +1,179 @@
 import React, { useState } from 'react';
-import { Droplet, Users, AlertCircle, Building2, Calendar, Phone, LogIn, UserPlus, LogOut, Menu, X, Bell } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 
-export const Navbar = ({ activePage, setActivePage }) => {
-  const { currentUser, isLoggedIn, logout } = useAuth();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+export default function Navbar({
+  activeTab,
+  setActiveTab,
+  currentUser,
+  onLoginClick,
+  onLogoutClick,
+  notifications = []
+}) {
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
-  const unreadMessagesCount = currentUser?.messages?.filter((m) => !m.read)?.length || 0;
-
-  const handleNavClick = (pageId) => {
-    setActivePage(pageId);
-    setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <header className="navbar">
-      <div className="container nav-container">
-        {/* Brand */}
-        <div className="nav-brand" onClick={() => handleNavClick('landing')}>
-          <div className="brand-icon-wrap" style={{ overflow: 'hidden', padding: 0 }}>
-            <img src="/logo.jpg" alt="NeoBlood Logo" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '10px' }} />
-          </div>
-          <div className="brand-text">
-            <span className="brand-title">Neo<span>Blood</span></span>
-            <span className="brand-subtitle">Blood Network</span>
-          </div>
-        </div>
+    <nav className="navbar">
+      <a
+        href="#home"
+        className="brand"
+        onClick={(e) => {
+          e.preventDefault();
+          setActiveTab('home');
+        }}
+      >
+        <img
+          src="https://cdn-icons-png.flaticon.com/512/1271/1271101.png"
+          alt="Logo"
+          style={{ width: '32px', height: '32px', filter: 'hue-rotate(330deg) saturate(200%)' }}
+        />
+        <span style={{ color: '#c1121f' }}>NeoBlood</span>
+      </a>
 
-        {/* Desktop Navigation */}
-        <ul className="nav-links">
-          <li>
-            <button
-              className={`nav-item-btn ${activePage === 'landing' ? 'active' : ''}`}
-              onClick={() => handleNavClick('landing')}
-            >
-              Home
-            </button>
-          </li>
-          <li>
-            <button
-              className={`nav-item-btn ${activePage === 'donors' ? 'active' : ''}`}
-              onClick={() => handleNavClick('donors')}
-            >
-              <Users size={16} /> Donors
-            </button>
-          </li>
-          <li>
-            <button
-              className={`nav-item-btn ${activePage === 'requests' ? 'active' : ''}`}
-              onClick={() => handleNavClick('requests')}
-            >
-              <AlertCircle size={16} /> Emergency Requests
-            </button>
-          </li>
-          <li>
-            <button
-              className={`nav-item-btn ${activePage === 'bloodbanks' ? 'active' : ''}`}
-              onClick={() => handleNavClick('bloodbanks')}
-            >
-              <Building2 size={16} /> Blood Banks
-            </button>
-          </li>
-          <li>
-            <button
-              className={`nav-item-btn ${activePage === 'contact' ? 'active' : ''}`}
-              onClick={() => handleNavClick('contact')}
-            >
-              <Phone size={16} /> Contact & Camps
-            </button>
-          </li>
-        </ul>
-
-        {/* Action Controls */}
-        <div className="nav-actions">
-          {isLoggedIn ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                className={`btn ${activePage === 'dashboard' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                onClick={() => handleNavClick('dashboard')}
-                style={{ position: 'relative' }}
-              >
-                <span>Dashboard</span>
-                <span className="bg-badge bg-badge-red" style={{ fontSize: '0.75rem', padding: '2px 6px', marginLeft: '4px' }}>
-                  {currentUser?.bloodGroup}
-                </span>
-                {unreadMessagesCount > 0 && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      right: '-6px',
-                      background: '#ef4444',
-                      color: 'white',
-                      fontSize: '0.7rem',
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700
-                    }}
-                  >
-                    {unreadMessagesCount}
-                  </span>
-                )}
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={logout} title="Sign Out">
-                <LogOut size={16} />
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => handleNavClick('login')}>
-                <LogIn size={15} /> Sign In
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={() => handleNavClick('register')}>
-                <UserPlus size={15} /> Join as Donor
-              </button>
-            </div>
-          )}
-
-          {/* Mobile Menu Button */}
-          <button
-            className="menu-toggle"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
+      <ul className="nav-links">
+        <li>
+          <a
+            href="#home"
+            className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('home');
+            }}
           >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-      </div>
+            Home
+          </a>
+        </li>
+        <li>
+          <a
+            href="#about"
+            className={`nav-item ${activeTab === 'about' ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('about');
+            }}
+          >
+            About
+          </a>
+        </li>
+        <li>
+          <a
+            href="#dashboard"
+            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('dashboard');
+            }}
+          >
+            Dashboard
+          </a>
+        </li>
+        <li>
+          <a
+            href="#create-request"
+            className={`nav-item ${activeTab === 'create-request' ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('create-request');
+            }}
+          >
+            Request Blood
+          </a>
+        </li>
+      </ul>
 
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="mobile-nav open">
-          <ul className="mobile-nav-list">
-            <li>
-              <button className={`nav-item-btn ${activePage === 'landing' ? 'active' : ''}`} onClick={() => handleNavClick('landing')}>
-                Home
-              </button>
-            </li>
-            <li>
-              <button className={`nav-item-btn ${activePage === 'donors' ? 'active' : ''}`} onClick={() => handleNavClick('donors')}>
-                <Users size={16} /> Find Donors
-              </button>
-            </li>
-            <li>
-              <button className={`nav-item-btn ${activePage === 'requests' ? 'active' : ''}`} onClick={() => handleNavClick('requests')}>
-                <AlertCircle size={16} /> Emergency Requests
-              </button>
-            </li>
-            <li>
-              <button className={`nav-item-btn ${activePage === 'bloodbanks' ? 'active' : ''}`} onClick={() => handleNavClick('bloodbanks')}>
-                <Building2 size={16} /> Nearby Blood Banks
-              </button>
-            </li>
-            <li>
-              <button className={`nav-item-btn ${activePage === 'contact' ? 'active' : ''}`} onClick={() => handleNavClick('contact')}>
-                <Phone size={16} /> Contact & Drives
-              </button>
-            </li>
-            {isLoggedIn ? (
-              <>
-                <li>
-                  <button className={`nav-item-btn ${activePage === 'dashboard' ? 'active' : ''}`} onClick={() => handleNavClick('dashboard')}>
-                    My Dashboard ({currentUser?.name})
-                  </button>
-                </li>
-                <li>
-                  <button className="nav-item-btn" onClick={() => { logout(); setMobileMenuOpen(false); }}>
-                    <LogOut size={16} /> Sign Out
-                  </button>
-                </li>
-              </>
-            ) : (
-              <li style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => handleNavClick('login')} style={{ flex: 1 }}>
-                  Sign In
-                </button>
-                <button className="btn btn-primary btn-sm" onClick={() => handleNavClick('register')} style={{ flex: 1 }}>
-                  Register
-                </button>
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
-    </header>
+      <div className="nav-actions">
+        {!currentUser ? (
+          <button className="auth-google-btn" id="google-login-btn" onClick={onLoginClick}>
+            <i className="fab fa-google"></i> Sign in / Register
+          </button>
+        ) : (
+          <>
+            {/* Notification Bell */}
+            <div
+              className="notif-bell"
+              id="notif-btn"
+              onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+              style={{ position: 'relative' }}
+            >
+              <i className="far fa-bell"></i>
+              {unreadCount > 0 && (
+                <div className="notif-badge" id="notif-badge">
+                  {unreadCount}
+                </div>
+              )}
+              {showNotifDropdown && (
+                <div
+                  id="notif-dropdown"
+                  className="glass-card"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: '40px',
+                    width: '320px',
+                    padding: '15px',
+                    zIndex: 1000,
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                    cursor: 'default'
+                  }}
+                >
+                  <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', color: '#1e293b' }}>
+                    Notifications
+                  </h4>
+                  <div
+                    id="notif-list"
+                    style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}
+                  >
+                    {notifications.length === 0 ? (
+                      <div style={{ fontSize: '0.9rem', color: '#64748b', textAlign: 'center', padding: '10px' }}>
+                        No new notifications
+                      </div>
+                    ) : (
+                      notifications.map((notif, idx) => (
+                        <div
+                          key={notif.id || idx}
+                          style={{
+                            padding: '8px 10px',
+                            background: notif.read ? '#f8fafc' : '#fef2f2',
+                            borderRadius: '8px',
+                            borderLeft: `3px solid ${notif.read ? '#cbd5e1' : '#c1121f'}`,
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          <strong style={{ color: '#1e293b' }}>{notif.title}</strong>
+                          <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.8rem' }}>{notif.message}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* User Profile */}
+            <div
+              className="user-profile-btn"
+              id="user-profile-display"
+              onClick={() => setActiveTab('dashboard')}
+            >
+              <div className="avatar">
+                {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <span>{currentUser.name || 'User'}</span>
+            </div>
+
+            {/* Logout button */}
+            <button
+              className="btn btn-danger"
+              id="logout-btn"
+              onClick={onLogoutClick}
+              style={{ borderRadius: '20px', padding: '8px 16px', fontSizes: '0.8rem' }}
+            >
+              Logout
+            </button>
+          </>
+        )}
+      </div>
+    </nav>
   );
-};
+}
