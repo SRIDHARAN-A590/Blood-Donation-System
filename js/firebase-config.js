@@ -30,12 +30,13 @@ import {
 // Default Firebase Configuration template
 // Replace these with your project credentials from Firebase Console
 export const firebaseConfig = {
-  apiKey: "AIzaSyBAivO-Bb8SmKSocKrag0Lmlw3zzLXrQU0",
-  authDomain: "lifepulse-blood-app-2b4be.firebaseapp.com",
-  projectId: "lifepulse-blood-app-2b4be",
-  storageBucket: "lifepulse-blood-app-2b4be.firebasestorage.app",
-  messagingSenderId: "452658311525",
-  appId: "1:452658311525:web:adc55918a981a3adadf18c"
+  apiKey: "AIzaSyDAsD1v7ydrl174uXWW9v1D8KD_UbW_tMM",
+  authDomain: "neoblood-com.firebaseapp.com",
+  projectId: "neoblood-com",
+  storageBucket: "neoblood-com.firebasestorage.app",
+  messagingSenderId: "309783403147",
+  appId: "1:309783403147:web:2130faf4e6bc881935528e",
+  measurementId: "G-RH8HSD3N2T"
 };
 
 let app, auth, db;
