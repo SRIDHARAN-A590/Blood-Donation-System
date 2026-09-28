@@ -21,22 +21,24 @@ const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 function validateRequestPayload(data) {
   const errors = [];
-  if (!data.patientName || typeof data.patientName !== 'string') {
-    errors.push('Patient name is required');
+  if (!data.patientName || typeof data.patientName !== 'string' || data.patientName.trim().length < 2) {
+    errors.push('Patient name is required (minimum 2 characters)');
   }
   if (!data.bloodGroup || !VALID_BLOOD_GROUPS.includes(data.bloodGroup.toUpperCase())) {
     errors.push(`Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}`);
   }
-  if (!data.hospitalName || typeof data.hospitalName !== 'string') {
+  if (!data.hospitalName || typeof data.hospitalName !== 'string' || data.hospitalName.trim().length < 2) {
     errors.push('Hospital name is required');
   }
   if (!data.city || typeof data.city !== 'string') {
     errors.push('City/District is required');
   }
-  if (!data.mobile || data.mobile.replace(/\D/g, '').length < 10) {
-    errors.push('Valid contact mobile number is required');
+  const rawMobile = data.mobile || data.phone || '';
+  const digits = String(rawMobile).replace(/\D/g, '');
+  if (!digits || digits.length < 10) {
+    errors.push('Valid 10-digit contact mobile number is required');
   }
-  const units = parseInt(data.unitsRequired);
+  const units = parseInt(data.unitsRequired || data.units);
   if (isNaN(units) || units < 1 || units > 20) {
     errors.push('Units required must be between 1 and 20');
   }

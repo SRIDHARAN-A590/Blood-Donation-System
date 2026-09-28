@@ -34,8 +34,9 @@ export const client = new MongoClient(uri);
 export async function connectToMongoDB() {
   try {
     await client.connect();
-    console.log("You successfully connected to MongoDB Atlas (NeoBlood cluster)!");
-    const db = client.db("neoblood");
+    const dbName = process.env.MONGODB_DB_NAME || "newbank";
+    console.log(`You successfully connected to MongoDB Atlas (NeoBlood cluster, db: ${dbName})!`);
+    const db = client.db(dbName);
     const ping = await db.command({ ping: 1 });
     console.log("Ping result:", ping);
     return db;

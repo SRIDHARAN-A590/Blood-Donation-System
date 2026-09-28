@@ -37,6 +37,15 @@ export default function CreateRequestTab({
     });
   }, [donors, formData.bloodGroup, formData.state, formData.district]);
 
+  React.useEffect(() => {
+    if (currentUser?.phone && !formData.mobile) {
+      setFormData(prev => ({ ...prev, mobile: currentUser.phone }));
+    }
+    if (currentUser?.email && !formData.email) {
+      setFormData(prev => ({ ...prev, email: currentUser.email }));
+    }
+  }, [currentUser]);
+
   const handleChange = (field, val) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: val };
@@ -50,8 +59,17 @@ export default function CreateRequestTab({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.patientName || !formData.hospitalName || !formData.mobile) {
-      alert('Please fill in the required fields.');
+    if (!formData.patientName || !formData.patientName.trim()) {
+      alert('Please fill in the patient name.');
+      return;
+    }
+    if (!formData.hospitalName || !formData.hospitalName.trim()) {
+      alert('Please fill in the hospital name.');
+      return;
+    }
+    const cleanMobile = (formData.mobile || '').replace(/\D/g, '');
+    if (cleanMobile.length < 10) {
+      alert('Please enter a valid 10-digit contact mobile number.');
       return;
     }
 
