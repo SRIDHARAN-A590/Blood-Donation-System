@@ -267,18 +267,25 @@ export const AuthProvider = ({ children }) => {
       isUrgent
     };
 
+    const isSendingToSelf = currentUser.email.toLowerCase() === donorEmail.toLowerCase();
+
     setUsers((prev) =>
       prev.map((u) => {
         if (u.email.toLowerCase() === donorEmail.toLowerCase()) {
           const updatedMessages = [newMessage, ...(u.messages || [])];
-          if (currentUser.email.toLowerCase() === donorEmail.toLowerCase()) {
-            setCurrentUser({ ...u, messages: updatedMessages });
-          }
           return { ...u, messages: updatedMessages };
         }
         return u;
       })
     );
+
+    // Update currentUser separately to avoid stale closure inside setUsers callback
+    if (isSendingToSelf) {
+      setCurrentUser((prev) => {
+        if (!prev) return prev;
+        return { ...prev, messages: [newMessage, ...(prev.messages || [])] };
+      });
+    }
 
     return true;
   };

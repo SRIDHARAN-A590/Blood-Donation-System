@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export const RequestBloodPage = ({ setActivePage }) => {
-  const { bloodRequests, addRequest, pledgeDonation, fulfillRequest } = useData();
+  const { bloodRequests, addRequest, pledgeDonation, fulfillRequest, hasPledged } = useData();
   const { showToast } = useToast();
   const { currentUser } = useAuth();
 
@@ -31,6 +31,12 @@ export const RequestBloodPage = ({ setActivePage }) => {
 
   const handleCreateRequest = (e) => {
     e.preventDefault();
+
+    if (!currentUser) {
+      showToast('Please sign in to post an emergency blood request', 'error');
+      setActivePage('login');
+      return;
+    }
 
     if (!formData.patientName || !formData.hospital || !formData.contactNumber) {
       showToast('Please fill in all mandatory fields', 'error');
@@ -63,16 +69,26 @@ export const RequestBloodPage = ({ setActivePage }) => {
   };
 
   const handlePledge = (req) => {
-    pledgeDonation(req.id);
+    if (!currentUser) {
+      showToast('Please sign in to pledge a donation', 'error');
+      setActivePage('login');
+      return;
+    }
+    if (hasPledged(req.id, currentUser.id)) {
+      showToast('You have already pledged for this request.', 'info');
+      return;
+    }
+    pledgeDonation(req.id, currentUser.id);
     showToast(`Thank you! Your pledge to donate for ${req.patientName} was recorded.`, 'success');
     try {
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
     } catch (err) {}
   };
 
+  // Show pending requests by default; fulfilled ones still visible but visually distinct
   const filteredRequests = bloodRequests.filter((r) => {
-    if (selectedGroup === 'All') return true;
-    return r.bloodGroup === selectedGroup;
+    const matchesGroup = selectedGroup === 'All' || r.bloodGroup === selectedGroup;
+    return matchesGroup;
   });
 
   return (
@@ -370,11 +386,13 @@ export const RequestBloodPage = ({ setActivePage }) => {
                     <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
                       {!isFulfilled ? (
                         <button
-                          className="btn btn-primary btn-sm"
+                          className={`btn btn-sm ${currentUser && hasPledged(req.id, currentUser.id) ? 'btn-secondary' : 'btn-primary'}`}
                           style={{ flex: 1 }}
                           onClick={() => handlePledge(req)}
+                          disabled={!!(currentUser && hasPledged(req.id, currentUser.id))}
                         >
-                          <Heart size={14} fill="white" /> Pledge Donation
+                          <Heart size={14} fill={currentUser && hasPledged(req.id, currentUser.id) ? 'none' : 'white'} />
+                          {currentUser && hasPledged(req.id, currentUser.id) ? 'Already Pledged' : 'Pledge Donation'}
                         </button>
                       ) : (
                         <span style={{ color: '#10b981', fontSize: '0.88rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>

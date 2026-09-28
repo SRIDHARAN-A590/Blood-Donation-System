@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Droplet, Heart, Award, Bell, CheckCircle2, MessageSquare, Phone, MapPin, AlertCircle, ToggleLeft, ToggleRight, Sparkles, Send } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
@@ -7,7 +7,7 @@ import { useToast } from '../context/ToastContext';
 
 export const DashboardPage = ({ setActivePage }) => {
   const { currentUser, toggleAvailability, markMessagesRead, updateUser, logout } = useAuth();
-  const { bloodRequests, pledgeDonation } = useData();
+  const { bloodRequests, pledgeDonation, hasPledged } = useData();
   const { showToast } = useToast();
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -17,6 +17,18 @@ export const DashboardPage = ({ setActivePage }) => {
     city: currentUser?.city || '',
     weight: currentUser?.weight || ''
   });
+
+  // Keep profile form in sync with currentUser (e.g. if user updates from another session)
+  useEffect(() => {
+    if (currentUser && !isEditingProfile) {
+      setProfileForm({
+        name: currentUser.name || '',
+        phone: currentUser.phone || '',
+        city: currentUser.city || '',
+        weight: currentUser.weight || ''
+      });
+    }
+  }, [currentUser, isEditingProfile]);
 
   if (!currentUser) {
     return (
@@ -50,7 +62,8 @@ export const DashboardPage = ({ setActivePage }) => {
   };
 
   const handlePledge = (req) => {
-    pledgeDonation(req.id);
+    if (!currentUser) return;
+    pledgeDonation(req.id, currentUser.id);
     showToast(`Thank you for pledging to donate for ${req.patientName}!`, 'success');
     try {
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
@@ -450,8 +463,13 @@ export const DashboardPage = ({ setActivePage }) => {
                   <div style={{ color: '#64748b', fontSize: '0.84rem' }}>{req.hospital}, {req.city}</div>
                   <p style={{ color: '#475569', fontSize: '0.84rem', margin: '8px 0 12px' }}>"{req.reason}"</p>
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={() => handlePledge(req)}>
-                  <Heart size={14} fill="white" /> Pledge to Donate
+                <button
+                  className={`btn btn-sm ${hasPledged(req.id, currentUser.id) ? 'btn-secondary' : 'btn-primary'}`}
+                  onClick={() => !hasPledged(req.id, currentUser.id) && handlePledge(req)}
+                  disabled={hasPledged(req.id, currentUser.id)}
+                >
+                  <Heart size={14} fill={hasPledged(req.id, currentUser.id) ? 'none' : 'white'} />
+                  {hasPledged(req.id, currentUser.id) ? 'Already Pledged' : 'Pledge to Donate'}
                 </button>
               </div>
             ))}

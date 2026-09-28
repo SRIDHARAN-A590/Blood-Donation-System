@@ -158,21 +158,38 @@ export const DataProvider = ({ children }) => {
       id: 'req-' + Math.random().toString(36).substring(2, 9),
       status: 'pending',
       pledgesCount: 0,
+      pledgedByIds: [],
       createdAt: new Date().toISOString()
     };
     setBloodRequests((prev) => [requestItem, ...prev]);
     return requestItem;
   };
 
-  const pledgeDonation = (requestId) => {
+  const pledgeDonation = (requestId, userId) => {
     setBloodRequests((prev) =>
       prev.map((req) => {
         if (req.id === requestId) {
-          return { ...req, pledgesCount: req.pledgesCount + 1 };
+          // Prevent duplicate pledges from the same user
+          const alreadyPledged = (req.pledgedByIds || []).includes(userId);
+          if (alreadyPledged) return req;
+          return {
+            ...req,
+            pledgesCount: req.pledgesCount + 1,
+            pledgedByIds: [...(req.pledgedByIds || []), userId]
+          };
         }
         return req;
       })
     );
+  };
+
+  const deleteRequest = (requestId) => {
+    setBloodRequests((prev) => prev.filter((req) => req.id !== requestId));
+  };
+
+  const hasPledged = (requestId, userId) => {
+    const req = bloodRequests.find((r) => r.id === requestId);
+    return req ? (req.pledgedByIds || []).includes(userId) : false;
   };
 
   const fulfillRequest = (requestId) => {
@@ -206,7 +223,9 @@ export const DataProvider = ({ children }) => {
         addRequest,
         pledgeDonation,
         fulfillRequest,
-        registerForCamp
+        registerForCamp,
+        deleteRequest,
+        hasPledged
       }}
     >
       {children}
