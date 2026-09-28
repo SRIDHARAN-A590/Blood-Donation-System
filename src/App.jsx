@@ -10,79 +10,62 @@ import MapTab from './components/MapTab';
 import OnboardingModal from './components/OnboardingModal';
 import Toast from './components/Toast';
 import Footer from './components/Footer';
-import { INITIAL_DONORS, INITIAL_REQUESTS, INITIAL_HOSPITALS } from './data/initialData';
+import { api } from './services/api';
+import { INITIAL_HOSPITALS } from './data/initialData';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
 
-  // Local state initialized from localStorage
+  // Active user session
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('neoblood_user');
+      const saved = sessionStorage.getItem('neoblood_session_user');
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
       return null;
     }
   });
 
-  const [donors, setDonors] = useState(() => {
-    try {
-      const saved = localStorage.getItem('neoblood_donors');
-      return saved ? JSON.parse(saved) : INITIAL_DONORS;
-    } catch (e) {
-      return INITIAL_DONORS;
-    }
-  });
+  // Data stored ONLY in MongoDB database
+  const [donors, setDonors] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
-  const [requests, setRequests] = useState(() => {
-    try {
-      const saved = localStorage.getItem('neoblood_requests');
-      return saved ? JSON.parse(saved) : INITIAL_REQUESTS;
-    } catch (e) {
-      return INITIAL_REQUESTS;
-    }
-  });
-
-  const [notifications, setNotifications] = useState(() => {
-    try {
-      const saved = localStorage.getItem('neoblood_notifs');
-      return saved ? JSON.parse(saved) : [
-        {
-          id: 'n-1',
-          title: '🚨 Urgent Request in Madurai',
-          message: 'Meenakshi Sundaram urgently needs 2 units of O+ blood at GRH Hospital.',
-          read: false,
-          timestamp: new Date().toISOString()
-        }
-      ];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  // In-memory notifications and toasts
+  const [notifications, setNotifications] = useState([]);
   const [toasts, setToasts] = useState([]);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
-  // Sync to localStorage
+  // Load all data directly from MongoDB Atlas on mount and tab switch
+  const loadDatabaseData = async () => {
+    setLoadingData(true);
+    try {
+      const [fetchedDonors, fetchedRequests] = await Promise.all([
+        api.getDonors(),
+        api.getRequests()
+      ]);
+      setDonors(fetchedDonors);
+      setRequests(fetchedRequests);
+    } catch (err) {
+      console.error("Failed to fetch from MongoDB:", err);
+      addToast("Database Connection", "Loading records from MongoDB Atlas...", "info");
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDatabaseData();
+  }, []);
+
+  // Sync active user session to sessionStorage (for login persistence across page refresh)
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('neoblood_user', JSON.stringify(currentUser));
+      sessionStorage.setItem('neoblood_session_user', JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem('neoblood_user');
+      sessionStorage.removeItem('neoblood_session_user');
     }
   }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem('neoblood_donors', JSON.stringify(donors));
-  }, [donors]);
-
-  useEffect(() => {
-    localStorage.setItem('neoblood_requests', JSON.stringify(requests));
-  }, [requests]);
-
-  useEffect(() => {
-    localStorage.setItem('neoblood_notifs', JSON.stringify(notifications));
-  }, [notifications]);
 
   // Toast Helper
   const addToast = (title, message, type = 'info') => {
@@ -108,122 +91,118 @@ export default function App() {
     addToast('Logged Out', 'You have been successfully logged out.', 'info');
   };
 
-  const handleSaveProfile = (profileData) => {
-    const userObj = {
-      uid: currentUser?.uid || 'user-' + Date.now(),
-      ...profileData
-    };
-    setCurrentUser(userObj);
-
-    // If registered as donor, add to donors list
-    if (userObj.role === 'donor') {
-      setDonors(prev => {
-        const existing = prev.findIndex(d => d.uid === userObj.uid);
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = { ...updated[existing], ...userObj };
-          return updated;
-        }
-        return [userObj, ...prev];
-      });
-    }
-
-    setIsOnboardingOpen(false);
-    addToast('Profile Saved', `Welcome to NeoBlood, ${userObj.name}!`, 'success');
+  // Save profile / Register directly into MongoDB database
+  const handleSaveProfile = async (profileData) => {
     try {
-      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-    } catch (e) {}
-  };
-
-  // Donor Handlers
-  const handleToggleAvailability = (newStatus) => {
-    if (!currentUser) return;
-    const updated = { ...currentUser, isAvailable: newStatus };
-    setCurrentUser(updated);
-    setDonors(prev => prev.map(d => d.uid === currentUser.uid ? { ...d, isAvailable: newStatus } : d));
-    addToast(
-      'Status Updated',
-      newStatus ? 'You are now marked as AVAILABLE for donations.' : 'You are now marked as UNAVAILABLE.',
-      'info'
-    );
-  };
-
-  const handleBecomeDonor = () => {
-    if (!currentUser) {
-      setIsOnboardingOpen(true);
-      return;
-    }
-    const updated = { ...currentUser, role: 'donor', isAvailable: true };
-    setCurrentUser(updated);
-    setDonors(prev => {
-      if (!prev.find(d => d.uid === currentUser.uid)) {
-        return [updated, ...prev];
-      }
-      return prev.map(d => d.uid === currentUser.uid ? updated : d);
-    });
-    addToast('Enrolled as Donor', 'You are now registered as an active blood donor!', 'success');
-  };
-
-  // Request Handlers
-  const handleAcceptRequest = (requestId) => {
-    if (!currentUser) {
-      setIsOnboardingOpen(true);
-      return;
-    }
-
-    setRequests(prev => prev.map(r => {
-      if (r.requestId === requestId) {
-        return {
-          ...r,
-          acceptedDonorId: currentUser.uid,
-          acceptedDonorName: currentUser.name
+      let savedUser;
+      if (profileData.role === 'donor') {
+        savedUser = await api.createDonor({
+          ...profileData,
+          uid: 'donor-' + Date.now()
+        });
+      } else {
+        savedUser = {
+          uid: 'user-' + Date.now(),
+          ...profileData
         };
       }
-      return r;
-    }));
 
-    // Trigger celebration
-    try {
-      confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
-    } catch (e) {}
+      setCurrentUser(savedUser);
+      setIsOnboardingOpen(false);
+      addToast('Saved to Database', `Profile for ${savedUser.name} registered directly in MongoDB!`, 'success');
 
-    addToast('Pledge Confirmed', 'Thank you for stepping up to save a life!', 'success');
+      // Refresh data from MongoDB
+      await loadDatabaseData();
 
-    // Add notification
-    const newNotif = {
-      id: 'notif-' + Date.now(),
-      title: 'Pledge Confirmed',
-      message: `You pledged to donate for request #${requestId.slice(-4)}. Hospital coordination instructions sent.`,
-      read: false,
-      timestamp: new Date().toISOString()
-    };
-    setNotifications(prev => [newNotif, ...prev]);
+      try {
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+      } catch (e) {}
+    } catch (err) {
+      addToast('Error', 'Failed to save to database: ' + err.message, 'error');
+    }
   };
 
-  const handleCreateRequest = (newReqData) => {
-    const newReq = {
-      requestId: 'req-' + Date.now(),
-      createdAt: new Date().toISOString(),
-      status: 'OPEN',
-      acceptedDonorId: null,
-      acceptedDonorName: null,
-      ...newReqData
-    };
+  // Update donor availability directly in MongoDB
+  const handleToggleAvailability = async (newStatus) => {
+    if (!currentUser) return;
+    try {
+      const idToUpdate = currentUser._id || currentUser.uid;
+      const updated = await api.updateDonor(idToUpdate, { isAvailable: newStatus });
+      setCurrentUser(prev => ({ ...prev, isAvailable: newStatus }));
 
-    setRequests(prev => [newReq, ...prev]);
-    setActiveTab('home');
+      addToast(
+        'Database Updated',
+        newStatus ? 'Status updated to AVAILABLE in MongoDB.' : 'Status updated to UNAVAILABLE in MongoDB.',
+        'info'
+      );
 
-    addToast('Request Broadcasted', 'Your emergency blood request is now live across the network!', 'success');
+      // Refresh live records from MongoDB
+      await loadDatabaseData();
+    } catch (err) {
+      addToast('Error', 'Failed to update database: ' + err.message, 'error');
+    }
+  };
 
-    // Notify matching donors
-    const newNotif = {
-      id: 'notif-' + Date.now(),
-      title: `🚨 Blood Needed: ${newReq.bloodGroup}`,
-      message: `${newReq.patientName} needs ${newReq.unitsRequired} unit(s) at ${newReq.hospitalName}, ${newReq.city}.`,
-      read: false,
-      timestamp: new Date().toISOString()
-    };
-    setNotifications(prev => [newNotif, ...prev]);
+  // Enroll as Donor directly in MongoDB
+  const handleBecomeDonor = async () => {
+    if (!currentUser) {
+      setIsOnboardingOpen(true);
+      return;
+    }
+    try {
+      const donorData = {
+        ...currentUser,
+        role: 'donor',
+        isAvailable: true
+      };
+      const created = await api.createDonor(donorData);
+      setCurrentUser(created);
+      addToast('Database Enrolled', 'Enrolled as an active blood donor in MongoDB Atlas!', 'success');
+      await loadDatabaseData();
+    } catch (err) {
+      addToast('Error', 'Database enrollment error: ' + err.message, 'error');
+    }
+  };
+
+  // Pledge Donation directly in MongoDB
+  const handleAcceptRequest = async (requestId) => {
+    if (!currentUser) {
+      setIsOnboardingOpen(true);
+      return;
+    }
+
+    try {
+      await api.pledgeRequest(requestId, currentUser.uid || currentUser._id, currentUser.name);
+
+      try {
+        confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
+      } catch (e) {}
+
+      addToast('Pledge Stored in DB', 'Your pledge has been saved directly to MongoDB Atlas!', 'success');
+
+      // Refresh live records from MongoDB
+      await loadDatabaseData();
+    } catch (err) {
+      addToast('Error', 'Failed to save pledge to database: ' + err.message, 'error');
+    }
+  };
+
+  // Create Blood Request directly into MongoDB
+  const handleCreateRequest = async (newReqData) => {
+    try {
+      const created = await api.createRequest({
+        ...newReqData,
+        requestId: 'req-' + Date.now()
+      });
+
+      setActiveTab('home');
+      addToast('Broadcasted to DB', 'Your emergency request is now saved live in MongoDB Atlas!', 'success');
+
+      // Refresh records from MongoDB
+      await loadDatabaseData();
+    } catch (err) {
+      addToast('Error', 'Failed to insert request into MongoDB: ' + err.message, 'error');
+    }
   };
 
   return (
@@ -231,7 +210,10 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          loadDatabaseData();
+        }}
         currentUser={currentUser}
         onLoginClick={handleLoginClick}
         onLogoutClick={handleLogoutClick}
@@ -243,6 +225,12 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="main-content">
+        {loadingData && donors.length === 0 && requests.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#c1121f', fontWeight: 600 }}>
+            <i className="fas fa-spinner fa-spin"></i> Connecting to MongoDB Atlas...
+          </div>
+        )}
+
         {activeTab === 'home' && (
           <HomeTab
             currentUser={currentUser}
