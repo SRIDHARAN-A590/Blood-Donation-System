@@ -1,11 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import authRoutes from './routes/authRoutes.js';
+import donorRoutes from './routes/donorRoutes.js';
 import {
-  createDonor,
-  getDonors,
-  getDonorById,
-  updateDonor,
-  deleteDonor,
   createRequest,
   getRequests,
   getRequestById,
@@ -21,24 +18,6 @@ app.use(cors());
 app.use(express.json());
 
 const VALID_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-
-// Validation helpers
-function validateDonorPayload(data) {
-  const errors = [];
-  if (!data.name || typeof data.name !== 'string' || data.name.trim().length < 2) {
-    errors.push('Name is required and must be at least 2 characters');
-  }
-  if (!data.bloodGroup || !VALID_BLOOD_GROUPS.includes(data.bloodGroup.toUpperCase())) {
-    errors.push(`Blood group must be one of: ${VALID_BLOOD_GROUPS.join(', ')}`);
-  }
-  if (!data.phone || data.phone.replace(/\D/g, '').length < 10) {
-    errors.push('Valid phone number with at least 10 digits is required');
-  }
-  if (!data.city || typeof data.city !== 'string') {
-    errors.push('City/District is required');
-  }
-  return errors;
-}
 
 function validateRequestPayload(data) {
   const errors = [];
@@ -70,74 +49,20 @@ app.get('/api/health', (req, res) => {
 });
 
 /* ==========================================================================
-   DONORS CRUD ENDPOINTS
+   AUTHENTICATION ROUTES (/api/auth)
    ========================================================================== */
-
-// [CREATE] Register a new donor with validation
-app.post('/api/donors', async (req, res) => {
-  try {
-    const errors = validateDonorPayload(req.body);
-    if (errors.length > 0) {
-      return res.status(400).json({ success: false, errors });
-    }
-
-    const donor = await createDonor({
-      ...req.body,
-      bloodGroup: req.body.bloodGroup.toUpperCase()
-    });
-    res.status(201).json({ success: true, data: donor });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// [READ] Get donors with query filters
-app.get('/api/donors', async (req, res) => {
-  try {
-    const donors = await getDonors(req.query);
-    res.json({ success: true, count: donors.length, data: donors });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// [READ] Get donor by id
-app.get('/api/donors/:id', async (req, res) => {
-  try {
-    const donor = await getDonorById(req.params.id);
-    if (!donor) return res.status(404).json({ success: false, message: 'Donor not found' });
-    res.json({ success: true, data: donor });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// [UPDATE] Update donor
-app.put('/api/donors/:id', async (req, res) => {
-  try {
-    const updated = await updateDonor(req.params.id, req.body);
-    if (!updated) return res.status(404).json({ success: false, message: 'Donor not found' });
-    res.json({ success: true, data: updated });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// [DELETE] Remove donor
-app.delete('/api/donors/:id', async (req, res) => {
-  try {
-    const result = await deleteDonor(req.params.id);
-    res.json({ success: result.success, deletedCount: result.deletedCount });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+app.use('/api/auth', authRoutes);
 
 /* ==========================================================================
-   BLOOD REQUESTS CRUD ENDPOINTS
+   BLOOD DONORS ROUTES (/api/donors)
+   ========================================================================== */
+app.use('/api/donors', donorRoutes);
+
+/* ==========================================================================
+   BLOOD REQUESTS ENDPOINTS (/api/requests)
    ========================================================================== */
 
-// [CREATE] Post emergency blood request with validation
+// [CREATE] Post a new blood request
 app.post('/api/requests', async (req, res) => {
   try {
     const errors = validateRequestPayload(req.body);
@@ -145,11 +70,11 @@ app.post('/api/requests', async (req, res) => {
       return res.status(400).json({ success: false, errors });
     }
 
-    const newReq = await createRequest({
+    const request = await createRequest({
       ...req.body,
       bloodGroup: req.body.bloodGroup.toUpperCase()
     });
-    res.status(201).json({ success: true, data: newReq });
+    res.status(201).json({ success: true, data: request });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -165,12 +90,14 @@ app.get('/api/requests', async (req, res) => {
   }
 });
 
-// [READ] Get request by id
+// [READ] Single request by id
 app.get('/api/requests/:id', async (req, res) => {
   try {
-    const reqItem = await getRequestById(req.params.id);
-    if (!reqItem) return res.status(404).json({ success: false, message: 'Request not found' });
-    res.json({ success: true, data: reqItem });
+    const request = await getRequestById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
+    res.json({ success: true, data: request });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -180,22 +107,28 @@ app.get('/api/requests/:id', async (req, res) => {
 app.put('/api/requests/:id', async (req, res) => {
   try {
     const updated = await updateRequest(req.params.id, req.body);
-    if (!updated) return res.status(404).json({ success: false, message: 'Request not found' });
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
     res.json({ success: true, data: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// [UPDATE - SPECIALIZED] Pledge donation to request
+// [UPDATE] Pledge donation to request
 app.post('/api/requests/:id/pledge', async (req, res) => {
   try {
     const { donorId, donorName } = req.body;
     if (!donorId || !donorName) {
-      return res.status(400).json({ success: false, message: 'donorId and donorName are required to pledge' });
+      return res.status(400).json({ success: false, error: 'donorId and donorName are required' });
     }
-    const pledged = await pledgeRequest(req.params.id, donorId, donorName);
-    res.json({ success: true, data: pledged });
+
+    const updated = await pledgeRequest(req.params.id, donorId, donorName);
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
+    res.json({ success: true, data: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -205,12 +138,21 @@ app.post('/api/requests/:id/pledge', async (req, res) => {
 app.delete('/api/requests/:id', async (req, res) => {
   try {
     const result = await deleteRequest(req.params.id);
-    res.json({ success: result.success, deletedCount: result.deletedCount });
+    if (!result.success) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
+    res.json({ success: true, message: 'Request removed successfully' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
+// Global 404
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: 'Endpoint not found' });
+});
+
+// Start Express Server
 app.listen(PORT, () => {
-  console.log(`🚀 NeoBlood MongoDB API server running on http://localhost:${PORT}`);
+  console.log(`NeoBlood Backend API server running on http://localhost:${PORT}`);
 });

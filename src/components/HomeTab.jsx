@@ -10,6 +10,9 @@ export default function HomeTab({
   onRetryConnection,
   onAcceptRequest,
   onOpenCreateRequest,
+  onSignInClick,
+  onRegisterClick,
+  onBecomeDonorClick,
   onLoginClick
 }) {
   const [filterBlood, setFilterBlood] = useState('');
@@ -88,18 +91,40 @@ export default function HomeTab({
 
         <div className="app-store-buttons" id="home-cta-container">
           {!currentUser ? (
-            <button
-              className="btn btn-primary"
-              style={{
-                borderRadius: '30px',
-                padding: '14px 32px',
-                fontSize: '1.1rem',
-                boxShadow: '0 10px 20px rgba(230,57,70,0.3)'
-              }}
-              onClick={onLoginClick}
-            >
-              Login / Register to Continue <i className="fas fa-arrow-right"></i>
-            </button>
+            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                className="btn btn-outline"
+                id="hero-signin-btn"
+                style={{
+                  borderRadius: '30px',
+                  padding: '14px 28px',
+                  fontSize: '1.05rem',
+                  fontWeight: 700,
+                  background: 'white',
+                  borderColor: '#cbd5e1',
+                  color: '#1e293b',
+                  cursor: 'pointer'
+                }}
+                onClick={onSignInClick || onLoginClick}
+              >
+                Sign In
+              </button>
+              <button
+                className="btn btn-primary"
+                id="hero-register-btn"
+                style={{
+                  borderRadius: '30px',
+                  padding: '14px 32px',
+                  fontSize: '1.05rem',
+                  fontWeight: 700,
+                  boxShadow: '0 10px 20px rgba(230,57,70,0.3)',
+                  cursor: 'pointer'
+                }}
+                onClick={onRegisterClick || onLoginClick}
+              >
+                Create Account <i className="fas fa-arrow-right"></i>
+              </button>
+            </div>
           ) : (
             <button
               className="btn btn-primary"

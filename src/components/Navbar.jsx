@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
+import { LogIn, UserPlus, LogOut, Bell, HeartHandshake, User } from 'lucide-react';
 
 export default function Navbar({
   activeTab,
   setActiveTab,
   currentUser,
-  onLoginClick,
+  onSignInClick,
+  onRegisterClick,
+  onBecomeDonorClick,
   onLogoutClick,
   notifications = []
 }) {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -27,7 +29,7 @@ export default function Navbar({
           alt="Logo"
           style={{ width: '32px', height: '32px', filter: 'hue-rotate(330deg) saturate(200%)' }}
         />
-        <span style={{ color: '#c1121f' }}>NeoBlood</span>
+        <span style={{ color: '#c1121f', fontWeight: 800 }}>NeoBlood</span>
       </a>
 
       <ul className="nav-links">
@@ -81,21 +83,88 @@ export default function Navbar({
         </li>
       </ul>
 
-      <div className="nav-actions">
+      <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {!currentUser ? (
-          <button className="auth-google-btn" id="google-login-btn" onClick={onLoginClick}>
-            <i className="fab fa-google"></i> Sign in / Register
-          </button>
+          <>
+            {/* Dedicated Sign In Button */}
+            <button
+              className="btn btn-outline"
+              id="navbar-signin-btn"
+              onClick={onSignInClick}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                border: '1.5px solid #cbd5e1',
+                background: 'white',
+                color: '#1e293b',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer'
+              }}
+            >
+              <LogIn size={16} /> Sign In
+            </button>
+
+            {/* Dedicated Register Button */}
+            <button
+              className="btn btn-primary"
+              id="navbar-register-btn"
+              onClick={onRegisterClick}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 18px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #c1121f, #780000)',
+                color: 'white',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 10px rgba(193, 18, 31, 0.25)'
+              }}
+            >
+              <UserPlus size={16} /> Register
+            </button>
+          </>
         ) : (
           <>
+            {/* Become a Donor CTA if user is not yet a donor */}
+            {(!currentUser.donorProfile && currentUser.role !== 'donor') && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={onBecomeDonorClick}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  borderColor: '#c1121f',
+                  color: '#c1121f',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  background: '#fff5f5',
+                  cursor: 'pointer'
+                }}
+              >
+                <HeartHandshake size={16} /> Become a Donor
+              </button>
+            )}
+
             {/* Notification Bell */}
             <div
               className="notif-bell"
               id="notif-btn"
               onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-              style={{ position: 'relative' }}
+              style={{ position: 'relative', cursor: 'pointer' }}
             >
-              <i className="far fa-bell"></i>
+              <Bell size={20} color="#475569" />
               {unreadCount > 0 && (
                 <div className="notif-badge" id="notif-badge">
                   {unreadCount}
@@ -155,21 +224,54 @@ export default function Navbar({
               className="user-profile-btn"
               id="user-profile-display"
               onClick={() => setActiveTab('dashboard')}
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
             >
-              <div className="avatar">
+              <div
+                className="avatar"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #c1121f, #780000)',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '0.9rem'
+                }}
+              >
                 {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
               </div>
-              <span>{currentUser.name || 'User'}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>
+                  {currentUser.name || 'User'}
+                </span>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.2 }}>
+                  {currentUser.email ? (currentUser.email.length > 18 ? currentUser.email.substring(0, 16) + '...' : currentUser.email) : 'Logged In'}
+                </span>
+              </div>
             </div>
 
             {/* Logout button */}
             <button
-              className="btn btn-danger"
+              className="btn btn-outline"
               id="logout-btn"
               onClick={onLogoutClick}
-              style={{ borderRadius: '20px', padding: '8px 16px', fontSizes: '0.8rem' }}
+              title="Logout"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                borderRadius: '10px',
+                padding: '8px 12px',
+                fontSize: '0.85rem',
+                borderColor: '#e2e8f0',
+                color: '#64748b',
+                cursor: 'pointer'
+              }}
             >
-              Logout
+              <LogOut size={15} />
             </button>
           </>
         )}

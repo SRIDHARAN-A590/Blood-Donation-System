@@ -1,0 +1,205 @@
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import {
+  createUser,
+  findUserByEmail,
+  findUserById,
+  updateUser,
+  getDonorByUserId
+} from '../crud.js';
+import { authenticateToken, JWT_SECRET } from '../middleware/auth.js';
+
+const router = express.Router();
+
+function createToken(user) {
+  return jwt.sign(
+    {
+      id: String(user._id || user.id),
+      email: user.email,
+      role: user.role || 'user'
+    },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+}
+
+function sanitizeUser(user, donorProfile = null) {
+  return {
+    id: String(user._id || user.id),
+    name: user.name,
+    email: user.email,
+    role: user.role || 'user',
+    authProviders: user.authProviders || ['password'],
+    emailVerified: !!user.emailVerified,
+    createdAt: user.createdAt,
+    donorProfile: donorProfile || null
+  };
+}
+
+// [REGISTER] Email + Password
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return res.status(400).json({ success: false, error: 'Full name must be at least 2 characters' });
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ success: false, error: 'A valid email address is required' });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters long' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await findUserByEmail(normalizedEmail);
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'An account with this email already exists.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const newUser = await createUser({
+      name: name.trim(),
+      email: normalizedEmail,
+      passwordHash,
+      authProviders: ['password'],
+      role: 'user',
+      emailVerified: false
+    });
+
+    const token = createToken(newUser);
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully',
+      token,
+      user: sanitizeUser(newUser)
+    });
+  } catch (err) {
+    console.error('Registration Error:', err);
+    res.status(500).json({ success: false, error: 'Failed to create account. Please try again.' });
+  }
+});
+
+// [LOGIN] Email + Password
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'Email and password are required' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await findUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+    }
+
+    if (!user.passwordHash) {
+      return res.status(400).json({
+        success: false,
+        error: 'This account was registered using Google. Please sign in with Google.'
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+    }
+
+    const donorProfile = await getDonorByUserId(user._id);
+    const token = createToken(user);
+
+    res.json({
+      success: true,
+      message: 'Signed in successfully',
+      token,
+      user: sanitizeUser(user, donorProfile)
+    });
+  } catch (err) {
+    console.error('Login Error:', err);
+    res.status(500).json({ success: false, error: 'Authentication error. Please try again.' });
+  }
+});
+
+// [GOOGLE SIGN-IN / REGISTER]
+router.post('/google', async (req, res) => {
+  try {
+    const { email, name, googleId, photoURL } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Google verified email is required' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    let user = await findUserByEmail(normalizedEmail);
+
+    if (user) {
+      // Account Linking: Ensure 'google' provider is attached
+      const providers = user.authProviders || [];
+      const needsUpdate = !providers.includes('google') || !user.googleId;
+      if (needsUpdate) {
+        const updatedProviders = providers.includes('google') ? providers : [...providers, 'google'];
+        user = await updateUser(user._id, {
+          authProviders: updatedProviders,
+          googleId: googleId || user.googleId,
+          emailVerified: true
+        });
+      }
+    } else {
+      // Create fresh user via Google verified identity
+      user = await createUser({
+        name: name || 'Google User',
+        email: normalizedEmail,
+        passwordHash: null,
+        authProviders: ['google'],
+        googleId: googleId || null,
+        role: 'user',
+        emailVerified: true
+      });
+    }
+
+    const donorProfile = await getDonorByUserId(user._id);
+    const token = createToken(user);
+
+    res.json({
+      success: true,
+      message: 'Google authentication successful',
+      token,
+      user: sanitizeUser(user, donorProfile)
+    });
+  } catch (err) {
+    console.error('Google Auth Error:', err);
+    res.status(500).json({ success: false, error: 'Google authentication failed. Please try again.' });
+  }
+});
+
+// [VERIFY SESSION / ME]
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const donorProfile = await getDonorByUserId(user._id);
+    res.json({
+      success: true,
+      user: sanitizeUser(user, donorProfile)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// [LOGOUT]
+router.post('/logout', (req, res) => {
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+export default router;

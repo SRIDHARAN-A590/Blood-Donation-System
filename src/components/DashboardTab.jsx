@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { User, Mail, Shield, HeartHandshake, MapPin, Phone, Droplet, CheckCircle, Clock } from 'lucide-react';
 
 export default function DashboardTab({
   currentUser,
@@ -7,166 +8,290 @@ export default function DashboardTab({
   onToggleAvailability,
   onBecomeDonor,
   onOpenCreateRequest,
-  onLoginClick
+  onSignInClick,
+  onRegisterClick
 }) {
   if (!currentUser) {
     return (
       <div id="view-dashboard" className="tab-view active" style={{ display: 'block', textAlign: 'center', padding: '60px 20px' }}>
-        <div className="glass-card" style={{ maxWidth: '500px', margin: '0 auto', padding: '40px' }}>
+        <div className="glass-card" style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 30px', borderRadius: '20px' }}>
           <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔒</div>
-          <h2>Sign in Required</h2>
-          <p style={{ color: '#64748b', marginTop: '10px', marginBottom: '24px' }}>
-            Please log in or register to access your personalized blood donation dashboard and pledges.
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1e293b' }}>Sign In Required</h2>
+          <p style={{ color: '#64748b', marginTop: '10px', marginBottom: '24px', lineHeight: 1.5 }}>
+            Please sign in with your email and password or Google account to access your personal dashboard.
           </p>
-          <button className="btn btn-primary" onClick={onLoginClick}>
-            <i className="fab fa-google"></i> Sign In / Register
-          </button>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button className="btn btn-outline" onClick={onSignInClick} style={{ padding: '10px 20px' }}>
+              Sign In
+            </button>
+            <button className="btn btn-primary" onClick={onRegisterClick} style={{ padding: '10px 22px' }}>
+              Register
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  const isDonor = currentUser.role === 'donor';
-  const myPledges = requests.filter(r => r.acceptedDonorId === currentUser.uid);
-  const myRequests = requests.filter(r => r.mobile === currentUser.phone || r.email === currentUser.email);
+  // Check if current user has an active donor profile
+  const donorProfile = currentUser.donorProfile || donors.find(d =>
+    (d.userId && (d.userId === currentUser.id || d.userId === currentUser._id || d.userId === currentUser.uid)) ||
+    (d.email && d.email.toLowerCase() === currentUser.email?.toLowerCase())
+  );
+
+  const isDonor = !!donorProfile;
+  const isAvailable = donorProfile ? (donorProfile.availability ?? donorProfile.isAvailable ?? true) : false;
+
+  const myPledges = requests.filter(r =>
+    r.acceptedDonorId === currentUser.id ||
+    r.acceptedDonorId === currentUser.uid ||
+    (donorProfile && r.acceptedDonorId === (donorProfile._id || donorProfile.uid))
+  );
+
+  const myRequests = requests.filter(r =>
+    r.email === currentUser.email ||
+    (donorProfile && r.mobile === donorProfile.phone)
+  );
 
   return (
-    <div id="view-dashboard" className="tab-view active" style={{ display: 'block' }}>
-      {/* Profile & Status Card */}
-      <div className="glass-card" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div className="avatar" style={{ width: '56px', height: '56px', fontSize: '1.5rem', background: '#c1121f' }}>
-            {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{currentUser.name}</h2>
-              <span className="blood-badge sm">{currentUser.bloodGroup || 'O+'}</span>
-            </div>
-            <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.9rem' }}>
-              <i className="fas fa-map-marker-alt"></i> {[currentUser.city, currentUser.state].filter(Boolean).join(', ') || 'India'}
-              {currentUser.phone ? ` • ${currentUser.phone}` : ''}
-            </p>
-          </div>
-        </div>
+    <div id="view-dashboard" className="tab-view active" style={{ display: 'block', maxWidth: '1100px', margin: '0 auto', padding: '20px' }}>
 
-        {isDonor ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                Availability Status
-              </span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: currentUser.isAvailable ? '#10b981' : '#64748b' }}>
-                {currentUser.isAvailable ? '🟢 Ready to Donate' : '🔴 Currently Unavailable'}
-              </span>
+      {/* Grid: User Identity Card vs Donor Profile Card */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+
+        {/* Card 1: User Account Profile */}
+        <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', background: 'white' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+            <div
+              style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.4rem',
+                fontWeight: 800
+              }}
+            >
+              {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
             </div>
-            <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '52px', height: '28px' }}>
-              <input
-                type="checkbox"
-                checked={!!currentUser.isAvailable}
-                onChange={(e) => onToggleAvailability(e.target.checked)}
-                style={{ opacity: 0, width: 0, height: 0 }}
-              />
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>
+                {currentUser.name}
+              </h3>
               <span
                 style={{
-                  position: 'absolute',
-                  cursor: 'pointer',
-                  top: 0, left: 0, right: 0, bottom: 0,
-                  backgroundColor: currentUser.isAvailable ? '#10b981' : '#cbd5e1',
-                  borderRadius: '34px',
-                  transition: '0.3s'
+                  display: 'inline-block',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  marginTop: '4px'
                 }}
               >
-                <span
-                  style={{
-                    position: 'absolute',
-                    height: '20px',
-                    width: '20px',
-                    left: currentUser.isAvailable ? '26px' : '4px',
-                    bottom: '4px',
-                    backgroundColor: 'white',
-                    borderRadius: '50%',
-                    transition: '0.3s'
-                  }}
-                />
+                Role: {currentUser.role || 'user'}
               </span>
-            </label>
+            </div>
           </div>
-        ) : (
-          <button className="btn btn-primary" onClick={onBecomeDonor}>
-            ❤️ Enroll as a Blood Donor
-          </button>
-        )}
+
+          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.9rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#475569' }}>
+              <Mail size={16} color="#64748b" />
+              <span><strong>Email:</strong> {currentUser.email}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#475569' }}>
+              <Shield size={16} color="#64748b" />
+              <span><strong>Auth Provider:</strong> {currentUser.authProviders?.join(', ') || 'Email/Password'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#475569' }}>
+              <CheckCircle size={16} color="#10b981" />
+              <span><strong>Database:</strong> MongoDB Atlas (users collection)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Blood Donor Profile (or Become a Donor CTA) */}
+        <div
+          className="glass-card"
+          style={{
+            padding: '24px',
+            borderRadius: '16px',
+            background: isDonor ? 'white' : '#fffaf0',
+            border: isDonor ? '1px solid #e2e8f0' : '1.5px dashed #fbd38d'
+          }}
+        >
+          {isDonor ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 700, color: '#c1121f' }}>
+                    Verified Donor Profile
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+                      {donorProfile.name || currentUser.name}
+                    </h3>
+                    <span className="blood-badge sm" style={{ background: '#c1121f', color: 'white', padding: '3px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                      {donorProfile.bloodGroup || 'O+'}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                    Availability Status
+                  </span>
+                  <button
+                    onClick={() => onToggleAvailability(!isAvailable)}
+                    className="btn btn-sm"
+                    style={{
+                      borderRadius: '20px',
+                      padding: '6px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      background: isAvailable ? '#ecfdf5' : '#f8fafc',
+                      color: isAvailable ? '#059669' : '#64748b',
+                      border: `1.5px solid ${isAvailable ? '#a7f3d0' : '#cbd5e1'}`,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isAvailable ? '🟢 Available' : '⚪ Unavailable'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.88rem', color: '#475569' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MapPin size={15} color="#c1121f" />
+                  <span>{[donorProfile.address, donorProfile.city, donorProfile.state].filter(Boolean).join(', ')}</span>
+                </div>
+                {donorProfile.phone && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Phone size={15} color="#c1121f" />
+                    <span>{donorProfile.phone}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={15} color="#64748b" />
+                  <span>Stored in MongoDB Atlas (<strong>bloodDonors</strong> collection)</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '10px 0' }}>
+              <div
+                style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '12px',
+                  background: '#feebc8',
+                  color: '#c05621',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 12px'
+                }}
+              >
+                <HeartHandshake size={24} />
+              </div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 800, color: '#7b341e' }}>
+                Join the Donor Registry
+              </h3>
+              <p style={{ color: '#744210', fontSize: '0.85rem', marginBottom: '16px', lineHeight: 1.4 }}>
+                You have a user account, but you haven't created a blood donor profile yet. Register to start saving lives!
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={onBecomeDonor}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #c1121f, #780000)',
+                  border: 'none',
+                  fontWeight: 700
+                }}
+              >
+                Become a Blood Donor
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Stats Row */}
-      <div id="dashboard-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '24px' }}>
-        <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', color: '#c1121f', fontWeight: 800 }}>{myPledges.length}</div>
-          <div style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>Donation Pledges</div>
-        </div>
-        <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', color: '#10b981', fontWeight: 800 }}>{myPledges.length * 3}</div>
-          <div style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>Lives Impacted</div>
-        </div>
-        <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', color: '#3b82f6', fontWeight: 800 }}>{myRequests.length}</div>
-          <div style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>My Blood Requests</div>
-        </div>
+      {/* Quick Action Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>
+          My Emergency Activity
+        </h3>
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={onOpenCreateRequest}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px' }}
+        >
+          + Request Blood Immediately
+        </button>
       </div>
 
-      {/* My Requests & Donation History */}
-      <div id="dashboard-history" style={{ marginTop: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ margin: 0 }}>My Active Requests & Pledges</h3>
-          <button className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={onOpenCreateRequest}>
-            + New Request
-          </button>
+      {/* Grid: My Pledges & My Requests */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+        {/* Pledges */}
+        <div className="glass-card" style={{ padding: '20px', borderRadius: '14px', background: 'white' }}>
+          <h4 style={{ margin: '0 0 14px 0', color: '#1e293b', fontSize: '1.05rem', fontWeight: 700 }}>
+            My Active Pledges ({myPledges.length})
+          </h4>
+          {myPledges.length === 0 ? (
+            <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: 0 }}>
+              You haven't pledged for any emergency requests yet.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {myPledges.map((req, i) => (
+                <div key={req._id || i} style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '8px', borderLeft: '3px solid #10b981' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '0.88rem' }}>
+                    <span>{req.patientName}</span>
+                    <span style={{ color: '#c1121f' }}>{req.bloodGroup}</span>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '3px' }}>
+                    {req.hospitalName}, {req.city}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {myRequests.length === 0 && myPledges.length === 0 ? (
-          <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-            <p>You have not made any blood requests or pledges yet.</p>
-            <p style={{ fontSize: '0.85rem', marginTop: '6px' }}>Browse the Home tab to see emergency requests nearby.</p>
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Patient / Details</th>
-                  <th>Blood Group</th>
-                  <th>Hospital</th>
-                  <th>Urgency</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {myRequests.map(r => (
-                  <tr key={r.requestId}>
-                    <td><span style={{ background: '#fef2f2', color: '#c1121f', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>My Request</span></td>
-                    <td><strong>{r.patientName}</strong></td>
-                    <td><span className="blood-badge sm">{r.bloodGroup}</span></td>
-                    <td>{r.hospitalName}</td>
-                    <td>{r.emergencyLevel}</td>
-                    <td><span style={{ color: r.status === 'OPEN' ? '#f59e0b' : '#10b981', fontWeight: 600 }}>{r.status}</span></td>
-                  </tr>
-                ))}
-                {myPledges.map(r => (
-                  <tr key={'pledge-' + r.requestId}>
-                    <td><span style={{ background: '#ecfdf5', color: '#10b981', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>Donation Pledge</span></td>
-                    <td><strong>{r.patientName}</strong></td>
-                    <td><span className="blood-badge sm">{r.bloodGroup}</span></td>
-                    <td>{r.hospitalName}</td>
-                    <td>{r.emergencyLevel}</td>
-                    <td><span style={{ color: '#10b981', fontWeight: 600 }}>Accepted by You</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Requests */}
+        <div className="glass-card" style={{ padding: '20px', borderRadius: '14px', background: 'white' }}>
+          <h4 style={{ margin: '0 0 14px 0', color: '#1e293b', fontSize: '1.05rem', fontWeight: 700 }}>
+            My Blood Requests ({myRequests.length})
+          </h4>
+          {myRequests.length === 0 ? (
+            <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: 0 }}>
+              You haven't posted any emergency requests.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {myRequests.map((req, i) => (
+                <div key={req._id || i} style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '8px', borderLeft: '3px solid #c1121f' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '0.88rem' }}>
+                    <span>{req.patientName}</span>
+                    <span className="blood-badge sm">{req.bloodGroup} ({req.unitsRequired} units)</span>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '3px' }}>
+                    Status: <strong style={{ color: req.status === 'PLEDGED' ? '#059669' : '#dc2626' }}>{req.status}</strong>
+                    {req.acceptedDonorName && ` (Pledged by ${req.acceptedDonorName})`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

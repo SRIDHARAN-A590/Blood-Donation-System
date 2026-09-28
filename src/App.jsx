@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import Navbar from './components/Navbar';
 import AnnouncementBanner from './components/AnnouncementBanner';
@@ -7,6 +7,7 @@ import AboutTab from './components/AboutTab';
 import DashboardTab from './components/DashboardTab';
 import CreateRequestTab from './components/CreateRequestTab';
 import MapTab from './components/MapTab';
+import AuthModal from './components/AuthModal';
 import OnboardingModal from './components/OnboardingModal';
 import Toast from './components/Toast';
 import Footer from './components/Footer';
@@ -16,7 +17,7 @@ import { INITIAL_HOSPITALS } from './data/initialData';
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
 
-  // Active user session
+  // Active user session (User Account from MongoDB Atlas)
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = sessionStorage.getItem('neoblood_session_user');
@@ -35,7 +36,11 @@ export default function App() {
   // In-memory notifications and toasts
   const [notifications, setNotifications] = useState([]);
   const [toasts, setToasts] = useState([]);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+
+  // Modals state: Distinct AuthModal vs DonorModal
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login'); // 'login' or 'register'
+  const [isDonorModalOpen, setIsDonorModalOpen] = useState(false);
 
   // Toast Helper
   const addToast = (title, message, type = 'info') => {
@@ -50,7 +55,7 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Load data directly from MongoDB Atlas
+  // Load data directly from MongoDB Atlas (bloodDonors & requests)
   const loadDatabaseData = async (isBackgroundSync = false) => {
     if (!isBackgroundSync) setLoadingData(true);
     try {
@@ -72,7 +77,16 @@ export default function App() {
     }
   };
 
-  // Initial load
+  // Check existing session via token on mount
+  useEffect(() => {
+    api.getMe().then(user => {
+      if (user) {
+        setCurrentUser(user);
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Initial data load
   useEffect(() => {
     loadDatabaseData();
   }, []);
@@ -94,128 +108,136 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Auth Handlers
-  const handleLoginClick = () => {
-    setIsOnboardingOpen(true);
+  // Auth Open Handlers
+  const handleOpenSignIn = () => {
+    setAuthModalMode('login');
+    setIsAuthModalOpen(true);
+  };
+
+  const handleOpenRegister = () => {
+    setAuthModalMode('register');
+    setIsAuthModalOpen(true);
+  };
+
+  const handleAuthSuccess = (user, message) => {
+    setCurrentUser(user);
+    addToast('Authentication Success', message, 'success');
+    try {
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    } catch (e) {}
   };
 
   const handleLogoutClick = () => {
+    api.logout();
     setCurrentUser(null);
     setActiveTab('home');
     addToast('Logged Out', 'You have been successfully logged out.', 'info');
   };
 
-  // Register donor / profile with Optimistic Update
-  const handleSaveProfile = async (profileData) => {
+  // Open "Become a Blood Donor" form (separate from User Account)
+  const handleOpenBecomeDonor = () => {
+    if (!currentUser) {
+      setAuthModalMode('register');
+      setIsAuthModalOpen(true);
+      addToast('Account Required', 'Please register or sign in first to create a donor profile.', 'info');
+      return;
+    }
+    setIsDonorModalOpen(true);
+  };
+
+  // Save Donor Profile in MongoDB Atlas 'bloodDonors' collection
+  const handleSaveDonorProfile = async (donorData) => {
     const tempId = 'temp-' + Date.now();
-    const optimisticUser = {
+    const optimisticDonor = {
       _id: tempId,
       uid: tempId,
-      ...profileData
+      userId: currentUser?.id || currentUser?._id,
+      ...donorData
     };
 
-    // Optimistic UI update
-    setCurrentUser(optimisticUser);
-    if (profileData.role === 'donor') {
-      setDonors(prev => [optimisticUser, ...prev]);
-    }
-    setIsOnboardingOpen(false);
+    // Optimistic UI updates
+    setDonors(prev => [optimisticDonor, ...prev]);
+    setIsDonorModalOpen(false);
 
     try {
-      let savedUser;
-      if (profileData.role === 'donor') {
-        savedUser = await api.createDonor({
-          ...profileData,
-          uid: 'donor-' + Date.now()
-        });
-      } else {
-        savedUser = {
-          uid: 'user-' + Date.now(),
-          ...profileData
-        };
-      }
+      const savedDonor = await api.createDonor({
+        ...donorData,
+        userId: currentUser?.id || currentUser?._id
+      });
 
-      setCurrentUser(savedUser);
-      addToast('Profile Saved', `Welcome to NeoBlood, ${savedUser.name}! Saved in MongoDB.`, 'success');
+      setCurrentUser(prev => ({
+        ...prev,
+        role: 'donor',
+        donorProfile: savedDonor
+      }));
 
+      addToast('Donor Profile Created', `Congratulations ${savedDonor.name}! Saved in MongoDB Atlas bloodDonors.`, 'success');
       try {
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+        confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
       } catch (e) {}
 
       await loadDatabaseData(true);
     } catch (err) {
-      // Rollback on failure
-      setCurrentUser(null);
       setDonors(prev => prev.filter(d => d._id !== tempId));
-      addToast('Registration Failed', err.message || 'Could not save to MongoDB. Please try again.', 'error');
+      addToast('Donor Registration Error', err.message || 'Could not save donor to MongoDB Atlas.', 'error');
     }
   };
 
   // Toggle Donor Availability with Optimistic Update & Rollback
   const handleToggleAvailability = async (newStatus) => {
     if (!currentUser) return;
-    const previousStatus = currentUser.isAvailable;
-    const donorId = currentUser._id || currentUser.uid;
+    const donorProfile = currentUser.donorProfile || donors.find(d =>
+      d.userId === currentUser.id || d.userId === currentUser._id || d.email === currentUser.email
+    );
+    if (!donorProfile) {
+      handleOpenBecomeDonor();
+      return;
+    }
 
-    // 1. Optimistic Update (zero lag UI flip)
-    setCurrentUser(prev => ({ ...prev, isAvailable: newStatus }));
-    setDonors(prev => prev.map(d => (d._id === donorId || d.uid === donorId) ? { ...d, isAvailable: newStatus } : d));
+    const donorId = donorProfile._id || donorProfile.uid;
+    const previousStatus = donorProfile.availability ?? donorProfile.isAvailable;
+
+    // Optimistic Update
+    setDonors(prev => prev.map(d =>
+      (d._id === donorId || d.uid === donorId) ? { ...d, availability: newStatus, isAvailable: newStatus } : d
+    ));
+    if (currentUser.donorProfile) {
+      setCurrentUser(prev => ({
+        ...prev,
+        donorProfile: { ...prev.donorProfile, availability: newStatus, isAvailable: newStatus }
+      }));
+    }
 
     try {
-      await api.updateDonor(donorId, { isAvailable: newStatus });
+      await api.updateDonor(donorId, { availability: newStatus, isAvailable: newStatus });
       addToast(
         'Status Synchronized',
         newStatus ? 'Marked AVAILABLE in MongoDB Atlas.' : 'Marked UNAVAILABLE in MongoDB Atlas.',
         'info'
       );
     } catch (err) {
-      // 2. Rollback on network/DB failure
-      setCurrentUser(prev => ({ ...prev, isAvailable: previousStatus }));
-      setDonors(prev => prev.map(d => (d._id === donorId || d.uid === donorId) ? { ...d, isAvailable: previousStatus } : d));
+      // Rollback on failure
+      setDonors(prev => prev.map(d =>
+        (d._id === donorId || d.uid === donorId) ? { ...d, availability: previousStatus, isAvailable: previousStatus } : d
+      ));
       addToast('Update Failed', 'Failed to update MongoDB status. Rolled back.', 'error');
-    }
-  };
-
-  // Enroll as Donor with Optimistic Update
-  const handleBecomeDonor = async () => {
-    if (!currentUser) {
-      setIsOnboardingOpen(true);
-      return;
-    }
-    const donorData = {
-      ...currentUser,
-      role: 'donor',
-      isAvailable: true
-    };
-
-    try {
-      const created = await api.createDonor(donorData);
-      setCurrentUser(created);
-      setDonors(prev => [created, ...prev.filter(d => d.uid !== created.uid && d._id !== created._id)]);
-      addToast('Enrolled as Donor', 'Your profile is now saved live in MongoDB Atlas!', 'success');
-      try {
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      } catch (e) {}
-    } catch (err) {
-      addToast('Error', 'Failed to enroll: ' + err.message, 'error');
     }
   };
 
   // Pledge Donation with Optimistic Update & Rollback
   const handleAcceptRequest = async (requestId) => {
     if (!currentUser) {
-      setIsOnboardingOpen(true);
+      handleOpenSignIn();
       return;
     }
 
-    // 1. Optimistic Update
     const originalRequests = [...requests];
     setRequests(prev => prev.map(r => {
       const isMatch = r._id === requestId || r.requestId === requestId;
       if (isMatch) {
         return {
           ...r,
-          acceptedDonorId: currentUser.uid || currentUser._id,
+          acceptedDonorId: currentUser.id || currentUser.uid,
           acceptedDonorName: currentUser.name,
           status: 'PLEDGED'
         };
@@ -229,16 +251,15 @@ export default function App() {
     addToast('Pledge Submitted', 'Your pledge has been saved to MongoDB Atlas!', 'success');
 
     try {
-      await api.pledgeRequest(requestId, currentUser.uid || currentUser._id, currentUser.name);
+      await api.pledgeRequest(requestId, currentUser.id || currentUser.uid, currentUser.name);
       await loadDatabaseData(true);
     } catch (err) {
-      // 2. Rollback on failure
       setRequests(originalRequests);
       addToast('Pledge Failed', 'Could not record pledge in MongoDB. Rolled back.', 'error');
     }
   };
 
-  // Create Blood Request with Optimistic Update & Rollback
+  // Create Blood Request
   const handleCreateRequest = async (newReqData) => {
     const tempId = 'temp-req-' + Date.now();
     const optimisticReq = {
@@ -251,20 +272,19 @@ export default function App() {
       ...newReqData
     };
 
-    // Optimistic UI insertion
     setRequests(prev => [optimisticReq, ...prev]);
     setActiveTab('home');
 
     try {
       const created = await api.createRequest({
         ...newReqData,
-        requestId: 'req-' + Date.now()
+        requestId: 'req-' + Date.now(),
+        email: currentUser?.email || newReqData.email || null
       });
 
       addToast('Request Broadcasted', 'Emergency request saved live in MongoDB Atlas!', 'success');
       await loadDatabaseData(true);
     } catch (err) {
-      // Rollback on failure
       setRequests(prev => prev.filter(r => r._id !== tempId));
       addToast('Broadcast Failed', 'Could not save request to MongoDB: ' + err.message, 'error');
     }
@@ -280,7 +300,9 @@ export default function App() {
           loadDatabaseData(true);
         }}
         currentUser={currentUser}
-        onLoginClick={handleLoginClick}
+        onSignInClick={handleOpenSignIn}
+        onRegisterClick={handleOpenRegister}
+        onBecomeDonorClick={handleOpenBecomeDonor}
         onLogoutClick={handleLogoutClick}
         notifications={notifications}
       />
@@ -300,7 +322,10 @@ export default function App() {
             onRetryConnection={() => loadDatabaseData(false)}
             onAcceptRequest={handleAcceptRequest}
             onOpenCreateRequest={() => setActiveTab('create-request')}
-            onLoginClick={handleLoginClick}
+            onSignInClick={handleOpenSignIn}
+            onRegisterClick={handleOpenRegister}
+            onBecomeDonorClick={handleOpenBecomeDonor}
+            onLoginClick={handleOpenSignIn}
           />
         )}
 
@@ -314,9 +339,10 @@ export default function App() {
             donors={donors}
             requests={requests}
             onToggleAvailability={handleToggleAvailability}
-            onBecomeDonor={handleBecomeDonor}
+            onBecomeDonor={handleOpenBecomeDonor}
             onOpenCreateRequest={() => setActiveTab('create-request')}
-            onLoginClick={handleLoginClick}
+            onSignInClick={handleOpenSignIn}
+            onRegisterClick={handleOpenRegister}
           />
         )}
 
@@ -341,11 +367,19 @@ export default function App() {
       {/* Footer */}
       <Footer />
 
-      {/* Onboarding Modal */}
+      {/* Authentication Modal (Sign In vs Register with Google & Email/Password) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        initialMode={authModalMode}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
+
+      {/* Become a Blood Donor Modal (Collection: bloodDonors) */}
       <OnboardingModal
-        isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
-        onSave={handleSaveProfile}
+        isOpen={isDonorModalOpen}
+        onClose={() => setIsDonorModalOpen(false)}
+        onSave={handleSaveDonorProfile}
         currentUser={currentUser}
       />
 
