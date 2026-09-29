@@ -79,6 +79,26 @@ export async function updateUser(id, updateData) {
   return result;
 }
 
+/**
+ * [DELETE] Remove user account
+ */
+export async function deleteUser(id) {
+  const db = await connectToMongoDB();
+  const _id = toMongoId(id);
+  const result = await db.collection('users').deleteOne({
+    $or: [{ _id }, { uid: id }]
+  });
+  return { success: result.deletedCount > 0 };
+}
+
+/**
+ * [READ] Get all users
+ */
+export async function getAllUsers() {
+  const db = await connectToMongoDB();
+  return await db.collection('users').find({}).toArray();
+}
+
 /* ==========================================================================
    BLOOD DONORS CRUD OPERATIONS (Collection: bloodDonors)
    ========================================================================== */
@@ -329,3 +349,222 @@ export async function deleteRequest(id) {
 
   return { success: result.deletedCount > 0, deletedCount: result.deletedCount };
 }
+
+/* ==========================================================================
+   BLOOD BANKS CRUD OPERATIONS (Collection: bloodBanks)
+   ========================================================================== */
+
+/**
+ * [CREATE] Add a new Blood Bank to MongoDB
+ */
+export async function createBloodBank(bankData) {
+  const db = await connectToMongoDB();
+  const defaultStock = {
+    'A+': 10, 'A-': 5, 'B+': 10, 'B-': 5,
+    'AB+': 5, 'AB-': 2, 'O+': 15, 'O-': 5
+  };
+
+  const bank = {
+    id: bankData.id || `bb-${Date.now()}`,
+    name: bankData.name?.trim() || 'Community Blood Centre',
+    hospitalName: bankData.hospitalName?.trim() || bankData.name?.trim() || 'Regional Hospital',
+    address: bankData.address?.trim() || '',
+    city: bankData.city?.trim() || 'Madurai',
+    district: bankData.district?.trim() || bankData.city?.trim() || 'Madurai',
+    state: bankData.state?.trim() || 'Tamil Nadu',
+    contact: bankData.contact?.trim() || bankData.phone?.trim() || '',
+    phone: bankData.phone?.trim() || bankData.contact?.trim() || '',
+    email: bankData.email?.trim().toLowerCase() || '',
+    operatingHours: bankData.operatingHours?.trim() || '24/7 Emergency Service',
+    distanceKm: parseFloat(bankData.distanceKm) || 2.5,
+    lat: parseFloat(bankData.lat) || 9.9312,
+    lng: parseFloat(bankData.lng) || 78.1310,
+    availableBloodGroups: {
+      ...defaultStock,
+      ...(bankData.availableBloodGroups || {})
+    },
+    verified: bankData.verified !== undefined ? bankData.verified : true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const result = await db.collection('bloodBanks').insertOne(bank);
+  return { _id: result.insertedId, ...bank };
+}
+
+/**
+ * [READ] Get blood banks with filters (city, state, search, bloodGroup availability)
+ */
+export async function getBloodBanks(filter = {}) {
+  const db = await connectToMongoDB();
+  const query = {};
+
+  if (filter.state) {
+    query.state = new RegExp(`^${filter.state}$`, 'i');
+  }
+  if (filter.city) {
+    query.city = new RegExp(`^${filter.city}$`, 'i');
+  }
+  if (filter.district) {
+    query.district = new RegExp(`^${filter.district}$`, 'i');
+  }
+
+  let banks = await db.collection('bloodBanks').find(query).sort({ createdAt: -1 }).toArray();
+
+  if (filter.search) {
+    const term = filter.search.toLowerCase().trim();
+    banks = banks.filter(b =>
+      (b.name && b.name.toLowerCase().includes(term)) ||
+      (b.hospitalName && b.hospitalName.toLowerCase().includes(term)) ||
+      (b.city && b.city.toLowerCase().includes(term)) ||
+      (b.address && b.address.toLowerCase().includes(term))
+    );
+  }
+
+  if (filter.bloodGroup) {
+    const bg = filter.bloodGroup.toUpperCase().trim();
+    banks = banks.filter(b => (b.availableBloodGroups?.[bg] || 0) > 0);
+  }
+
+  return banks;
+}
+
+/**
+ * [READ] Get single blood bank by ID
+ */
+export async function getBloodBankById(id) {
+  const db = await connectToMongoDB();
+  const _id = toMongoId(id);
+  return await db.collection('bloodBanks').findOne({
+    $or: [{ _id }, { id }]
+  });
+}
+
+/**
+ * [UPDATE] Update blood bank details or stock
+ */
+export async function updateBloodBank(id, updateData) {
+  const db = await connectToMongoDB();
+  const _id = toMongoId(id);
+
+  const updates = {
+    ...updateData,
+    updatedAt: new Date().toISOString()
+  };
+
+  const result = await db.collection('bloodBanks').findOneAndUpdate(
+    { $or: [{ _id }, { id }] },
+    { $set: updates },
+    { returnDocument: 'after' }
+  );
+
+  return result;
+}
+
+/**
+ * [UPDATE - SPECIALIZED] Update stock units for specific blood groups
+ */
+export async function updateBloodBankStock(id, stockUpdates) {
+  const bank = await getBloodBankById(id);
+  if (!bank) return null;
+
+  const currentStock = bank.availableBloodGroups || {};
+  const newStock = { ...currentStock, ...stockUpdates };
+
+  return await updateBloodBank(id, { availableBloodGroups: newStock });
+}
+
+/**
+ * [DELETE] Remove blood bank
+ */
+export async function deleteBloodBank(id) {
+  const db = await connectToMongoDB();
+  const _id = toMongoId(id);
+
+  const result = await db.collection('bloodBanks').deleteOne({
+    $or: [{ _id }, { id }]
+  });
+
+  return { success: result.deletedCount > 0, deletedCount: result.deletedCount };
+}
+
+/* ==========================================================================
+   DONATION CAMPS CRUD OPERATIONS (Collection: camps)
+   ========================================================================== */
+
+export async function createCamp(campData) {
+  const db = await connectToMongoDB();
+  const camp = {
+    id: campData.id || `camp-${Date.now()}`,
+    title: campData.title?.trim() || 'Community Blood Camp',
+    location: campData.location?.trim() || '',
+    city: campData.city?.trim() || 'Madurai',
+    state: campData.state?.trim() || 'Tamil Nadu',
+    date: campData.date || new Date().toISOString().split('T')[0],
+    time: campData.time || '09:00 AM - 04:00 PM',
+    organizer: campData.organizer?.trim() || 'NeoBlood Community',
+    contact: campData.contact?.trim() || '',
+    registeredCount: Number(campData.registeredCount) || 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const result = await db.collection('camps').insertOne(camp);
+  return { _id: result.insertedId, ...camp };
+}
+
+export async function getCamps(filter = {}) {
+  const db = await connectToMongoDB();
+  const query = {};
+  if (filter.city) query.city = new RegExp(`^${filter.city}$`, 'i');
+  if (filter.state) query.state = new RegExp(`^${filter.state}$`, 'i');
+  return await db.collection('camps').find(query).sort({ date: 1 }).toArray();
+}
+
+export async function getCampById(id) {
+  const db = await connectToMongoDB();
+  const _id = toMongoId(id);
+  return await db.collection('camps').findOne({
+    $or: [{ _id }, { id }]
+  });
+}
+
+export async function updateCamp(id, updateData) {
+  const db = await connectToMongoDB();
+  const _id = toMongoId(id);
+  const updates = { ...updateData, updatedAt: new Date().toISOString() };
+  return await db.collection('camps').findOneAndUpdate(
+    { $or: [{ _id }, { id }] },
+    { $set: updates },
+    { returnDocument: 'after' }
+  );
+}
+
+export async function registerForCamp(campId) {
+  const db = await connectToMongoDB();
+  const _id = toMongoId(campId);
+  const camp = await db.collection('camps').findOne({ $or: [{ _id }, { id: campId }] });
+  if (!camp) return null;
+
+  const currentCount = Number(camp.registeredCount) || 0;
+  return await db.collection('camps').findOneAndUpdate(
+    { $or: [{ _id }, { id: campId }] },
+    {
+      $set: {
+        registeredCount: currentCount + 1,
+        updatedAt: new Date().toISOString()
+      }
+    },
+    { returnDocument: 'after' }
+  );
+}
+
+export async function deleteCamp(id) {
+  const db = await connectToMongoDB();
+  const _id = toMongoId(id);
+  const result = await db.collection('camps').deleteOne({
+    $or: [{ _id }, { id }]
+  });
+  return { success: result.deletedCount > 0, deletedCount: result.deletedCount };
+}
+

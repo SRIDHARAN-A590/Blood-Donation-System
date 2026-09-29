@@ -6,6 +6,8 @@ import {
   findUserByEmail,
   findUserById,
   updateUser,
+  deleteUser,
+  getAllUsers,
   getDonorByUserId
 } from '../crud.js';
 import { authenticateToken, JWT_SECRET } from '../middleware/auth.js';
@@ -198,6 +200,75 @@ router.get('/me', authenticateToken, async (req, res) => {
       success: true,
       user: sanitizeUser(user, donorProfile)
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// [UPDATE USER PROFILE - CRUD]
+router.put('/profile', authenticateToken, async (req, res) => {
+  try {
+    const { name, phone, email, password } = req.body;
+    const updateData = {};
+
+    if (name && typeof name === 'string' && name.trim().length >= 2) {
+      updateData.name = name.trim();
+    }
+    if (phone !== undefined) {
+      updateData.phone = phone ? phone.trim() : null;
+    }
+    if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      const normalizedEmail = email.trim().toLowerCase();
+      // Check if email taken by someone else
+      const existing = await findUserByEmail(normalizedEmail);
+      if (existing && String(existing._id || existing.id) !== String(req.user.id)) {
+        return res.status(409).json({ success: false, error: 'Email already in use by another account' });
+      }
+      updateData.email = normalizedEmail;
+    }
+    if (password && password.length >= 6) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.passwordHash = await bcrypt.hash(password, salt);
+    }
+
+    const updatedUser = await updateUser(req.user.id, updateData);
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const donorProfile = await getDonorByUserId(updatedUser._id);
+    res.json({
+      success: true,
+      message: 'Profile updated successfully in MongoDB',
+      user: sanitizeUser(updatedUser, donorProfile)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// [GET ALL USERS - Admin / Registry]
+router.get('/users', async (req, res) => {
+  try {
+    const allUsers = await getAllUsers();
+    res.json({
+      success: true,
+      count: allUsers.length,
+      data: allUsers.map(u => sanitizeUser(u))
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// [DELETE USER ACCOUNT - CRUD]
+router.delete('/account', authenticateToken, async (req, res) => {
+  try {
+    const result = await deleteUser(req.user.id);
+    if (!result.success) {
+      return res.status(404).json({ success: false, error: 'User account not found' });
+    }
+    res.json({ success: true, message: 'User account deleted successfully from MongoDB' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

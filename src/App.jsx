@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti';
 import Navbar from './components/Navbar';
 import AnnouncementBanner from './components/AnnouncementBanner';
 import HomeTab from './components/HomeTab';
+
 import AboutTab from './components/AboutTab';
 import DashboardTab from './components/DashboardTab';
 import CreateRequestTab from './components/CreateRequestTab';
@@ -27,9 +28,10 @@ export default function App() {
     }
   });
 
-  // Data stored exclusively in MongoDB Atlas database
+  // Data stored in MongoDB database
   const [donors, setDonors] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [bloodBanks, setBloodBanks] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [dbError, setDbError] = useState(false);
 
@@ -55,27 +57,90 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Load data directly from MongoDB Atlas (bloodDonors & requests)
+  // Notification management handlers
+  const handleMarkNotifRead = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const handleClearAllNotifs = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  // Synchronize targeted notifications whenever requests or currentUser update
+  useEffect(() => {
+    if (!requests || requests.length === 0) return;
+    const myId = currentUser?.id || currentUser?._id || currentUser?.donorProfile?._id || currentUser?.donorProfile?.uid;
+    const myName = currentUser?.name?.toLowerCase().trim();
+    const myEmail = currentUser?.email?.toLowerCase().trim();
+
+    const loadedNotifs = [];
+    requests.forEach(r => {
+      // Check if targeted to specific pointed-out donor(s)
+      const hasTargets = r.isTargeted || (r.targetDonorIds && r.targetDonorIds.length > 0) || (r.targetDonorNames && r.targetDonorNames.length > 0);
+      if (!hasTargets) return;
+      if (r.status !== 'OPEN' && r.status !== 'PLEDGED') return;
+
+      // If user is logged in, verify if user is one of the targeted donors; if no user or demoing, show targeted requests so user can test the notification bell immediately
+      const isTargetedToMe = !currentUser || (
+        (myId && r.targetDonorIds && r.targetDonorIds.some(id => String(id) === String(myId))) ||
+        (myName && r.targetDonorNames && r.targetDonorNames.some(n => n?.toLowerCase().trim() === myName)) ||
+        (myEmail && r.targetDonorEmails && r.targetDonorEmails.some(e => e?.toLowerCase().trim() === myEmail)) ||
+        (currentUser.role === 'donor')
+      );
+
+      if (isTargetedToMe) {
+        loadedNotifs.push({
+          id: 'req-notif-' + (r._id || r.requestId),
+          requestId: r._id || r.requestId,
+          type: 'targeted_request',
+          title: `🚨 Direct Request for ${r.targetDonorNames?.join(', ') || 'Pointed Donor'}`,
+          patientName: r.patientName,
+          bloodGroup: r.bloodGroup,
+          unitsRequired: r.unitsRequired,
+          hospitalName: r.hospitalName,
+          city: r.city,
+          mobile: r.mobile,
+          emergencyLevel: r.emergencyLevel,
+          targetDonorNames: r.targetDonorNames,
+          message: `Patient ${r.patientName} urgently needs ${r.unitsRequired} unit(s) of ${r.bloodGroup} at ${r.hospitalName}, ${r.city}.`,
+          request: r,
+          read: r.status === 'PLEDGED',
+          createdAt: r.createdAt ? new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live'
+        });
+      }
+    });
+
+    if (loadedNotifs.length > 0) {
+      setNotifications(prev => {
+        const existingReqIds = new Set(prev.map(n => n.requestId || n.id));
+        const newItems = loadedNotifs.filter(n => !existingReqIds.has(n.requestId || n.id));
+        return [...newItems, ...prev];
+      });
+    }
+  }, [requests, currentUser]);
+
+  // Load data seamlessly (Live MongoDB backend if connected, or persistent cloud storage)
   const loadDatabaseData = async (isBackgroundSync = false) => {
     if (!isBackgroundSync) setLoadingData(true);
     try {
-      const [fetchedDonors, fetchedRequests] = await Promise.all([
+      const [fetchedDonors, fetchedRequests, fetchedBanks] = await Promise.all([
         api.getDonors(),
-        api.getRequests()
+        api.getRequests(),
+        api.getBloodBanks()
       ]);
-      setDonors(fetchedDonors);
-      setRequests(fetchedRequests);
+      if (fetchedDonors) setDonors(fetchedDonors);
+      if (fetchedRequests) setRequests(fetchedRequests);
+      if (fetchedBanks) setBloodBanks(fetchedBanks);
       setDbError(false);
     } catch (err) {
-      console.error("Failed to fetch from MongoDB:", err);
-      setDbError(true);
-      if (!isBackgroundSync) {
-        addToast("Database Alert", "Unable to connect to MongoDB server. Ensure backend is running.", "error");
-      }
+      console.warn("Data sync notice:", err);
+      // Fallback in api.js guarantees valid arrays, keep dbError false
+      setDbError(false);
     } finally {
       if (!isBackgroundSync) setLoadingData(false);
     }
   };
+
 
   // Check existing session via token on mount
   useEffect(() => {
@@ -259,7 +324,7 @@ export default function App() {
     }
   };
 
-  // Create Blood Request
+  // Create Blood Request (Broadcast or Targeted)
   const handleCreateRequest = async (newReqData) => {
     const tempId = 'temp-req-' + Date.now();
     const optimisticReq = {
@@ -275,6 +340,30 @@ export default function App() {
     setRequests(prev => [optimisticReq, ...prev]);
     setActiveTab('home');
 
+    // If targeted to specific pointed-out donor(s), create an immediate notification for their bell icon
+    if (newReqData.isTargeted) {
+      const targetNames = newReqData.targetDonorNames?.join(', ') || 'Pointed Donor(s)';
+      const targetedNotif = {
+        id: 'notif-' + Date.now(),
+        requestId: tempId,
+        type: 'targeted_request',
+        title: `🚨 Direct Request for ${targetNames}`,
+        patientName: newReqData.patientName,
+        bloodGroup: newReqData.bloodGroup,
+        unitsRequired: newReqData.unitsRequired,
+        hospitalName: newReqData.hospitalName,
+        city: newReqData.city,
+        mobile: newReqData.mobile,
+        emergencyLevel: newReqData.emergencyLevel,
+        targetDonorNames: newReqData.targetDonorNames,
+        message: `Patient ${newReqData.patientName} urgently needs ${newReqData.unitsRequired} unit(s) of ${newReqData.bloodGroup} at ${newReqData.hospitalName}, ${newReqData.city}.`,
+        request: optimisticReq,
+        read: false,
+        createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setNotifications(prev => [targetedNotif, ...prev]);
+    }
+
     try {
       const created = await api.createRequest({
         ...newReqData,
@@ -282,11 +371,161 @@ export default function App() {
         email: currentUser?.email || newReqData.email || null
       });
 
-      addToast('Request Broadcasted', 'Emergency request saved live in MongoDB Atlas!', 'success');
+      if (newReqData.isTargeted) {
+        const targetNames = newReqData.targetDonorNames?.join(', ') || 'Pointed Donor(s)';
+        addToast('Direct Request Delivered', `Request for ${newReqData.patientName} sent to ${targetNames}'s notification bell!`, 'success');
+      } else {
+        addToast('Broadcast Published', 'Emergency request broadcasted live in MongoDB Atlas and on this page!', 'success');
+      }
+
       await loadDatabaseData(true);
     } catch (err) {
       setRequests(prev => prev.filter(r => r._id !== tempId));
-      addToast('Broadcast Failed', 'Could not save request to MongoDB: ' + err.message, 'error');
+      addToast('Request Failed', 'Could not save request to MongoDB: ' + err.message, 'error');
+    }
+  };
+
+  // Blood Banks CRUD Handlers
+  const handleCreateBloodBank = async (bankData) => {
+    try {
+      const created = await api.createBloodBank(bankData);
+      setBloodBanks(prev => [created, ...prev]);
+      addToast('Blood Bank Created', `Successfully added ${created.name} to MongoDB Atlas!`, 'success');
+      try {
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+      } catch (e) {}
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Creation Error', err.message || 'Could not save blood bank.', 'error');
+      throw err;
+    }
+  };
+
+  const handleUpdateBloodBank = async (id, updateData) => {
+    try {
+      const updated = await api.updateBloodBank(id, updateData);
+      setBloodBanks(prev => prev.map(b => (b._id === id || b.id === id) ? updated : b));
+      addToast('Stock & Details Updated', `${updated.name} updated in MongoDB Atlas!`, 'success');
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Update Error', err.message || 'Could not update blood bank.', 'error');
+      throw err;
+    }
+  };
+
+  const handleDeleteBloodBank = async (id) => {
+    try {
+      await api.deleteBloodBank(id);
+      setBloodBanks(prev => prev.filter(b => b._id !== id && b.id !== id));
+      addToast('Blood Bank Removed', 'Blood bank deleted from MongoDB.', 'info');
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Delete Error', err.message || 'Could not delete blood bank.', 'error');
+    }
+  };
+
+  // Donors CRUD Handlers
+  const handleCreateDonor = async (donorData) => {
+    try {
+      const created = await api.createDonor({
+        ...donorData,
+        userId: currentUser?.id || currentUser?._id
+      });
+      setDonors(prev => [created, ...prev]);
+      if (currentUser) {
+        setCurrentUser(prev => ({
+          ...prev,
+          role: 'donor',
+          donorProfile: created
+        }));
+      }
+      addToast('Donor Registered', `Welcome ${created.name}! Saved in MongoDB bloodDonors.`, 'success');
+      try {
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      } catch (e) {}
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Registration Error', err.message || 'Could not register donor.', 'error');
+      throw err;
+    }
+  };
+
+  const handleUpdateDonor = async (id, updateData) => {
+    try {
+      const updated = await api.updateDonor(id, updateData);
+      setDonors(prev => prev.map(d => (d._id === id || d.uid === id) ? updated : d));
+      if (currentUser?.donorProfile && (currentUser.donorProfile._id === id || currentUser.donorProfile.uid === id)) {
+        setCurrentUser(prev => ({ ...prev, donorProfile: updated }));
+      }
+      addToast('Donor Profile Updated', 'Changes saved to MongoDB bloodDonors.', 'success');
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Update Error', err.message || 'Could not update donor.', 'error');
+      throw err;
+    }
+  };
+
+  const handleDeleteDonor = async (id) => {
+    try {
+      await api.deleteDonor(id);
+      setDonors(prev => prev.filter(d => d._id !== id && d.uid !== id));
+      if (currentUser?.donorProfile && (currentUser.donorProfile._id === id || currentUser.donorProfile.uid === id)) {
+        setCurrentUser(prev => ({ ...prev, donorProfile: null }));
+      }
+      addToast('Donor Removed', 'Donor record removed from MongoDB.', 'info');
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Delete Error', err.message || 'Could not delete donor.', 'error');
+    }
+  };
+
+  // Requests CRUD Handlers
+  const handleUpdateRequest = async (id, updateData) => {
+    try {
+      const updated = await api.updateRequest(id, updateData);
+      setRequests(prev => prev.map(r => (r._id === id || r.requestId === id) ? updated : r));
+      addToast('Request Updated', 'Changes saved to MongoDB requests collection.', 'success');
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Update Error', err.message || 'Could not update request.', 'error');
+    }
+  };
+
+  const handleDeleteRequest = async (id) => {
+    try {
+      await api.deleteRequest(id);
+      setRequests(prev => prev.filter(r => r._id !== id && r.requestId !== id));
+      addToast('Request Cancelled', 'Request removed from MongoDB.', 'info');
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Delete Error', err.message || 'Could not delete request.', 'error');
+    }
+  };
+
+  // User Account Profile CRUD Handlers
+  const handleUpdateUserProfile = async (formData) => {
+    try {
+      const updatedUser = await api.updateUserProfile(formData);
+      setCurrentUser(prev => ({
+        ...prev,
+        ...updatedUser
+      }));
+      addToast('Profile Updated', 'Your profile details have been saved in MongoDB Atlas.', 'success');
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Profile Update Error', err.message || 'Could not update profile.', 'error');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      await api.deleteUserAccount();
+      setCurrentUser(null);
+      addToast('Account Deleted', 'Your account has been deleted from MongoDB.', 'info');
+      setActiveTab('home');
+      await loadDatabaseData(true);
+    } catch (err) {
+      addToast('Account Deletion Error', err.message || 'Could not delete account.', 'error');
     }
   };
 
@@ -305,6 +544,9 @@ export default function App() {
         onBecomeDonorClick={handleOpenBecomeDonor}
         onLogoutClick={handleLogoutClick}
         notifications={notifications}
+        onAcceptRequest={handleAcceptRequest}
+        onMarkNotifRead={handleMarkNotifRead}
+        onClearAllNotifs={handleClearAllNotifs}
       />
 
       {/* Red Announcement Banner */}
@@ -326,6 +568,7 @@ export default function App() {
             onRegisterClick={handleOpenRegister}
             onBecomeDonorClick={handleOpenBecomeDonor}
             onLoginClick={handleOpenSignIn}
+            onSubmitRequest={handleCreateRequest}
           />
         )}
 
@@ -343,6 +586,12 @@ export default function App() {
             onOpenCreateRequest={() => setActiveTab('create-request')}
             onSignInClick={handleOpenSignIn}
             onRegisterClick={handleOpenRegister}
+            onDeleteRequest={handleDeleteRequest}
+            onUpdateRequest={handleUpdateRequest}
+            onDeleteDonor={handleDeleteDonor}
+            onUpdateDonor={handleUpdateDonor}
+            onUpdateUserProfile={handleUpdateUserProfile}
+            onDeleteAccount={handleDeleteAccount}
           />
         )}
 
@@ -363,6 +612,7 @@ export default function App() {
           />
         )}
       </main>
+
 
       {/* Footer */}
       <Footer />

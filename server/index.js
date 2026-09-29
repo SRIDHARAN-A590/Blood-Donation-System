@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import donorRoutes from './routes/donorRoutes.js';
+import bloodBankRoutes from './routes/bloodBankRoutes.js';
+import campRoutes from './routes/campRoutes.js';
+import { getDatabaseStatus } from './db.js';
 import {
   createRequest,
   getRequests,
@@ -47,7 +50,12 @@ function validateRequestPayload(data) {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'NeoBlood MongoDB API', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'NeoBlood MongoDB API',
+    database: getDatabaseStatus(),
+    timestamp: new Date().toISOString()
+  });
 });
 
 /* ==========================================================================
@@ -59,6 +67,17 @@ app.use('/api/auth', authRoutes);
    BLOOD DONORS ROUTES (/api/donors)
    ========================================================================== */
 app.use('/api/donors', donorRoutes);
+
+/* ==========================================================================
+   BLOOD BANKS ROUTES (/api/bloodbanks)
+   ========================================================================== */
+app.use('/api/bloodbanks', bloodBankRoutes);
+
+/* ==========================================================================
+   BLOOD CAMPS ROUTES (/api/camps)
+   ========================================================================== */
+app.use('/api/camps', campRoutes);
+
 
 /* ==========================================================================
    BLOOD REQUESTS ENDPOINTS (/api/requests)
@@ -155,6 +174,11 @@ app.use((req, res) => {
 });
 
 // Start Express Server
-app.listen(PORT, () => {
-  console.log(`NeoBlood Backend API server running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.FUNCTION_NAME) {
+  app.listen(PORT, () => {
+    console.log(`NeoBlood Backend API server running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
+export { app };

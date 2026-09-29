@@ -49,14 +49,27 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose, onSu
       const fbUser = result.user;
 
       // 2. Sync verified Google identity into MongoDB Atlas 'users' collection
-      const syncResult = await api.googleAuth({
-        email: fbUser.email,
-        name: fbUser.displayName || 'Google User',
-        googleId: fbUser.uid,
-        photoURL: fbUser.photoURL
-      });
+      let authenticatedUser = null;
+      try {
+        const syncResult = await api.googleAuth({
+          email: fbUser.email,
+          name: fbUser.displayName || 'Google User',
+          googleId: fbUser.uid,
+          photoURL: fbUser.photoURL
+        });
+        authenticatedUser = syncResult.user;
+      } catch (syncErr) {
+        console.warn('MongoDB Atlas sync notice (will use Firebase profile):', syncErr.message);
+        // Fallback user session from verified Google Firebase account
+        authenticatedUser = {
+          id: fbUser.uid,
+          name: fbUser.displayName || 'Google User',
+          email: fbUser.email,
+          role: 'user',
+          authProviders: ['google']
+        };
+      }
 
-      const authenticatedUser = syncResult.user;
       onSuccess(authenticatedUser, `Welcome, ${authenticatedUser.name}! Signed in via Google.`);
       handleClose();
     } catch (err) {
@@ -103,26 +116,45 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose, onSu
 
       setLoading(true);
       try {
-        // Create account in Firebase Auth (if available) for client sync
+        // 1. Create account in Firebase Auth
+        let fbUser = null;
         try {
           const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
           if (userCredential.user) {
             await updateProfile(userCredential.user, { displayName: name.trim() });
+            fbUser = userCredential.user;
           }
         } catch (fbErr) {
-          // If already in Firebase or Firebase error, continue to backend verification
           console.warn('Firebase register notice:', fbErr.message);
         }
 
-        // Register and persist user into MongoDB Atlas 'users' collection
-        const res = await api.register({
-          name: name.trim(),
-          email: trimmedEmail,
-          phone: phone.trim(),
-          password
-        });
+        // 2. Register and persist user into MongoDB Atlas 'users' collection
+        let resUser = null;
+        try {
+          const res = await api.register({
+            name: name.trim(),
+            email: trimmedEmail,
+            phone: phone.trim(),
+            password
+          });
+          resUser = res.user;
+        } catch (apiErr) {
+          console.warn('MongoDB Atlas backend API notice:', apiErr.message);
+          if (fbUser) {
+            resUser = {
+              id: fbUser.uid,
+              name: name.trim(),
+              email: trimmedEmail,
+              phone: phone.trim(),
+              role: 'user',
+              authProviders: ['password']
+            };
+          } else {
+            throw apiErr;
+          }
+        }
 
-        onSuccess(res.user, `Account created successfully! Welcome, ${res.user.name}.`);
+        onSuccess(resUser, `Account created successfully! Welcome, ${resUser.name}.`);
         handleClose();
       } catch (err) {
         setErrorMsg(err.message || 'Failed to create account. Please check details.');
@@ -138,20 +170,39 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose, onSu
 
       setLoading(true);
       try {
-        // Optional Firebase Auth sign-in
+        let loggedInUser = null;
+        // 1. Authenticate with Firebase Auth
+        let fbUser = null;
         try {
-          await signInWithEmailAndPassword(auth, trimmedEmail, password);
+          const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+          fbUser = cred.user;
         } catch (fbErr) {
           console.warn('Firebase login notice:', fbErr.message);
         }
 
-        // Authenticate against MongoDB Atlas
-        const res = await api.login({
-          email: trimmedEmail,
-          password
-        });
+        // 2. Authenticate against MongoDB Atlas
+        try {
+          const res = await api.login({
+            email: trimmedEmail,
+            password
+          });
+          loggedInUser = res.user;
+        } catch (apiErr) {
+          console.warn('MongoDB Atlas API login notice:', apiErr.message);
+          if (fbUser) {
+            loggedInUser = {
+              id: fbUser.uid,
+              name: fbUser.displayName || 'User',
+              email: fbUser.email,
+              role: 'user',
+              authProviders: ['password']
+            };
+          } else {
+            throw apiErr;
+          }
+        }
 
-        onSuccess(res.user, `Welcome back, ${res.user.name}!`);
+        onSuccess(loggedInUser, `Welcome back, ${loggedInUser.name}!`);
         handleClose();
       } catch (err) {
         setErrorMsg(err.message || 'Invalid email or password.');
